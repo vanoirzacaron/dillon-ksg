@@ -25,64 +25,11 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-// Select fonts used.
-$fontname = '';
-$fontheadername = '';
-$fonttitlename = '';
-$fontweight = '';
-$fontheaderweight = '';
-$fonttitleweight = '';
-$fontssubset = '';
-
-switch ($PAGE->theme->settings->fontname) {
-    case 'sans-serif':
-        // Use 'sans-serif'.
-    break;
-
-    default:
-        // Get the Google font.
-        $fontname = str_replace(" ", "+", $PAGE->theme->settings->fontname);
-    break;
-}
-
-switch ($PAGE->theme->settings->fontheadername) {
-    case 'sans-serif':
-        // Use 'sans-serif'.
-    break;
-
-    default:
-        // Get the Google font.
-        $fontheadername = str_replace(" ", "+", $PAGE->theme->settings->fontheadername);
-    break;
-}
-
-switch ($PAGE->theme->settings->fonttitlename) {
-    case 'sans-serif':
-        // Use 'sans-serif'.
-    break;
-
-    default:
-        // Get the Google font.
-        $fonttitlename = str_replace(" ", "+", $PAGE->theme->settings->fonttitlename);
-    break;
-}
-
-if ((!empty($fontname)) || (!empty($fontheadername)) || (!empty($fonttitlename))) {
-    // Get the Google Font weights.
-    $fontweight = ':'.$PAGE->theme->settings->fontweight.','.$PAGE->theme->settings->fontweight.'i';
-    $fontheaderweight = ':'.$PAGE->theme->settings->fontheaderweight.','.$PAGE->theme->settings->fontheaderweight.'i';
-    $fonttitleweight = ':'.$PAGE->theme->settings->fonttitleweight.','.$PAGE->theme->settings->fonttitleweight.'i';
-
-    // Get the Google fonts subset.
-    if (!empty($PAGE->theme->settings->fontsubset)) {
-        $fontssubset = '&subset='.$PAGE->theme->settings->fontsubset;
-    }
-}
-
 // HTML head.
-echo $OUTPUT->standard_head_html() ?>
+echo $OUTPUT->standard_head_html();
+$siteurl = new moodle_url('');
+?>
     <!-- CSS print media -->
-    <link rel="stylesheet" type="text/css" href="<?php echo $wwwroot; ?>/theme/adaptable/style/print.css" media="print">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <!-- Twitter Card data -->
@@ -93,7 +40,7 @@ echo $OUTPUT->standard_head_html() ?>
     <!-- Open Graph data -->
     <meta property="og:title" content="<?php echo $OUTPUT->page_title(); ?>" />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="<?php echo $wwwroot; ?>" />
+    <meta property="og:url" content="<?php echo $siteurl->out(); ?>" />
     <meta name="og:site_name" value="<?php echo $SITE->fullname; ?>" />
 
     <!-- Chrome, Firefox OS and Opera on Android topbar color -->
@@ -106,34 +53,44 @@ echo $OUTPUT->standard_head_html() ?>
     <meta name="apple-mobile-web-app-status-bar-style" content="<?php echo $PAGE->theme->settings->maincolor; ?>" />
 
     <?php
-    // Load fonts.
-    if ((!empty($fontname)) && ($fontname != 'default')) {
-        ?>
-    <!-- Load Google Fonts -->
-    <link href='https://fonts.googleapis.com/css?family=<?php echo $fontname.$fontweight.$fontssubset; ?>'
-    rel='stylesheet'
-    type='text/css'>
-    <?php
-    }
-    ?>
+    if (!empty($PAGE->theme->settings->googlefonts)) {
+        $fontssubset = '';
 
-    <?php
-    if ((!empty($fontheadername)) && ($fontheadername != 'default')) {
-    ?>
-        <link href='https://fonts.googleapis.com/css?family=<?php echo $fontheadername.$fontheaderweight.$fontssubset; ?>'
-        rel='stylesheet'
-        type='text/css'>
-    <?php
-    }
-    ?>
+        $fontsettings = array('fontname', 'fontheadername', 'fonttitlename');
+        $fontstoload = array();
+        foreach ($fontsettings as $fontsetting) {
+            switch ($PAGE->theme->settings->$fontsetting) {
+                case 'sans-serif':
+                break;
+                default:
+                    // Google font name.
+                    $fontname = str_replace(" ", "+", $PAGE->theme->settings->$fontsetting);
+                    if (!in_array($fontname, $fontstoload)) {
+                        $fontstoload[] = $fontname;
+                    }
+                break;
+            }
+        }
 
-    <?php
-    if ((!empty($fonttitlename)) && ($fonttitlename != 'default')) {
-    ?>
-        <link href='https://fonts.googleapis.com/css?family=<?php echo $fonttitlename.$fonttitleweight.$fontssubset; ?>'
-        rel='stylesheet'
-        type='text/css'>
-    <?php
+        if (!empty($fontstoload)) {
+            // Get the Google Font weights.
+            $fontweight = ':'.$PAGE->theme->settings->fontweight.','.$PAGE->theme->settings->fontweight.'i';
+            $fontheaderweight = ':'.$PAGE->theme->settings->fontheaderweight.','.$PAGE->theme->settings->fontheaderweight.'i';
+            $fonttitleweight = ':'.$PAGE->theme->settings->fonttitleweight.','.$PAGE->theme->settings->fonttitleweight.'i';
+
+            // Get the Google fonts subset.
+            if (!empty($PAGE->theme->settings->fontsubset)) {
+                $fontssubset = '&subset='.$PAGE->theme->settings->fontsubset;
+            }
+
+            // Load Google fonts.
+            echo '<!-- Load Google Fonts -->';
+            foreach ($fontstoload as $googlefontname) {
+                echo '<link href="https://fonts.googleapis.com/css?family=';
+                echo $googlefontname.$fontweight.$fontssubset;
+                echo '" rel="stylesheet" type="text/css">';
+            }
+        }
     }
     ?>
 </head>

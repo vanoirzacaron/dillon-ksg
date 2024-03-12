@@ -85,12 +85,17 @@ class backup_assign_activity_structure_step extends backup_activity_structure_st
                                                   'requireallteammemberssubmit',
                                                   'teamsubmissiongroupingid',
                                                   'blindmarking',
+                                                  'hidegrader',
                                                   'revealidentities',
                                                   'attemptreopenmethod',
                                                   'maxattempts',
                                                   'markingworkflow',
                                                   'markingallocation',
-                                                  'preventsubmissionnotingroup'));
+                                                  'preventsubmissionnotingroup',
+                                                  'activity',
+                                                  'activityformat',
+                                                  'timelimit',
+                                                  'submissionattachments'));
 
         $userflags = new backup_nested_element('userflags');
 
@@ -109,6 +114,7 @@ class backup_assign_activity_structure_step extends backup_activity_structure_st
                                                 array('userid',
                                                       'timecreated',
                                                       'timemodified',
+                                                      'timestarted',
                                                       'status',
                                                       'groupid',
                                                       'attemptnumber',
@@ -134,7 +140,7 @@ class backup_assign_activity_structure_step extends backup_activity_structure_st
 
         $overrides = new backup_nested_element('overrides');
         $override = new backup_nested_element('override', array('id'), array(
-            'groupid', 'userid', 'sortorder', 'allowsubmissionsfromdate', 'duedate', 'cutoffdate'));
+            'groupid', 'userid', 'sortorder', 'allowsubmissionsfromdate', 'duedate', 'cutoffdate', 'timelimit'));
 
         // Build the tree.
         $assign->add_child($userflags);

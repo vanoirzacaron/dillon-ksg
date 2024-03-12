@@ -68,7 +68,11 @@ if ($courseid) {
 } else {
     $course = null;
     $courseid = null;
-    $category = core_course_category::get_default();
+    $topchildren = core_course_category::top()->get_children();
+    if (empty($topchildren)) {
+        throw new moodle_exception('cannotviewcategory', 'error');
+    }
+    $category = reset($topchildren);
     $categoryid = $category->id;
     $context = context_coursecat::instance($category->id);
     $url->param('categoryid', $category->id);
@@ -96,13 +100,15 @@ if ($modulelist !== '') {
 }
 
 $strmanagement = new lang_string('coursecatmanagement');
-$pageheading = format_string($SITE->fullname, true, array('context' => $systemcontext));
+$pageheading = $category->get_formatted_name();
 
 $PAGE->set_context($context);
 $PAGE->set_url($url);
 $PAGE->set_pagelayout('admin');
 $PAGE->set_title($strmanagement);
 $PAGE->set_heading($pageheading);
+$PAGE->requires->js_call_amd('core_course/copy_modal', 'init', array($context->id));
+$PAGE->set_secondary_active_tab('categorymain');
 
 // This is a system level page that operates on other contexts.
 require_login();
@@ -116,6 +122,21 @@ if (!core_course_category::has_capability_on_any(array('moodle/category:manage',
     redirect($url);
 }
 
+if (!$issearching && $category !== null) {
+    $parents = core_course_category::get_many($category->get_parents());
+    $parents[] = $category;
+    foreach ($parents as $parent) {
+        $PAGE->navbar->add(
+            $parent->get_formatted_name(),
+            new moodle_url('/course/index.php', array('categoryid' => $parent->id))
+        );
+    }
+    if ($course instanceof core_course_list_element) {
+        // Use the list name so that it matches whats being displayed below.
+        $PAGE->navbar->add($course->get_formatted_name());
+    }
+}
+
 // If the user poses any of these capabilities then they will be able to see the admin
 // tree and the management link within it.
 // This is the most accurate form of navigation.
@@ -127,32 +148,19 @@ $capabilities = array(
     'moodle/site:approvecourse'
 );
 if ($category && !has_any_capability($capabilities, $systemcontext)) {
-    // If the user doesn't poses any of these system capabilities then we're going to mark the manage link in the settings block
-    // as active, tell the page to ignore the active path and just build what the user would expect.
+    // If the user doesn't poses any of these system capabilities then we're going to mark the category link in the
+    // settings block as active, tell the page to ignore the active path and just build what the user would expect.
     // This will at least give the page some relevant navigation.
-    navigation_node::override_active_url(new moodle_url('/course/management.php', array('categoryid' => $category->id)));
+    navigation_node::override_active_url(new moodle_url('/course/index.php', array('categoryid' => $category->id)));
     $PAGE->set_category_by_id($category->id);
     $PAGE->navbar->ignore_active(true);
-    $PAGE->navbar->add(get_string('coursemgmt', 'admin'), $PAGE->url->out_omit_querystring());
 } else {
-    // If user has system capabilities, make sure the "Manage courses and categories" item in Administration block is active.
+    // If user has system capabilities, make sure the "Category" item in Administration block is active.
     navigation_node::require_admin_tree();
-    navigation_node::override_active_url(new moodle_url('/course/management.php'));
+    navigation_node::override_active_url(new moodle_url('/course/index.php'));
 }
-if (!$issearching && $category !== null) {
-    $parents = core_course_category::get_many($category->get_parents());
-    $parents[] = $category;
-    foreach ($parents as $parent) {
-        $PAGE->navbar->add(
-            $parent->get_formatted_name(),
-            new moodle_url('/course/management.php', array('categoryid' => $parent->id))
-        );
-    }
-    if ($course instanceof core_course_list_element) {
-        // Use the list name so that it matches whats being displayed below.
-        $PAGE->navbar->add($course->get_formatted_name());
-    }
-}
+$PAGE->navbar->add(get_string('coursemgmt', 'admin'), $PAGE->url->out_omit_querystring());
+$PAGE->set_primary_active_tab('home');
 
 $notificationspass = array();
 $notificationsfail = array();
@@ -312,7 +320,8 @@ if ($action !== false && confirm_sesskey()) {
                         $notificationsfail[] = get_string('movecategoryownparent', 'error', $cattomove->get_formatted_name());
                         continue;
                     }
-                    if (strpos($movetocat->path, $cattomove->path) === 0) {
+                    // Don't allow user to move selected category into one of it's own sub-categories.
+                    if (strpos($movetocat->path, $cattomove->path . '/') === 0) {
                         $notificationsfail[] = get_string('movecategoryparentconflict', 'error', $cattomove->get_formatted_name());
                         continue;
                     }
@@ -378,9 +387,9 @@ if ($action !== false && confirm_sesskey()) {
                     }
                     $categories = core_course_category::get_many($categoryids);
                 } else if ($for === 'allcategories') {
-                    if ($sortcategoriesby && core_course_category::get(0)->can_resort_subcategories()) {
+                    if ($sortcategoriesby && core_course_category::top()->can_resort_subcategories()) {
                         \core_course\management\helper::action_category_resort_subcategories(
-                            core_course_category::get(0), $sortcategoriesby);
+                            core_course_category::top(), $sortcategoriesby);
                     }
                     $categorieslist = core_course_category::make_categories_list('moodle/category:manage');
                     $categoryids = array_keys($categorieslist);
@@ -449,7 +458,7 @@ if ($viewmode === 'default' || $viewmode === 'combined') {
     }
 }
 if ($viewmode === 'default' || $viewmode === 'combined') {
-    $class .= ' viewmode-cobmined';
+    $class .= ' viewmode-combined';
 } else {
     $class .= ' viewmode-'.$viewmode;
 }
@@ -466,12 +475,8 @@ $displaycourselisting = ($viewmode === 'default' || $viewmode === 'combined' || 
 $displaycoursedetail = (isset($courseid));
 
 echo $renderer->header();
-
-if (!$issearching) {
-    echo $renderer->management_heading($strmanagement, $viewmode, $categoryid);
-} else {
-    echo $renderer->management_heading(new lang_string('searchresults'));
-}
+$actionbar = new \core_course\output\manage_categories_action_bar($PAGE, $viewmode, $course, $search);
+echo $renderer->render_action_bar($actionbar);
 
 if (count($notificationspass) > 0) {
     echo $renderer->notification(join('<br />', $notificationspass), 'notifysuccess');
@@ -481,6 +486,7 @@ if (count($notificationsfail) > 0) {
 }
 
 // Start the management form.
+
 echo $renderer->management_form_start();
 
 echo $renderer->accessible_skipto_links($displaycategorylisting, $displaycourselisting, $displaycoursedetail);
@@ -512,6 +518,5 @@ echo $renderer->grid_end();
 
 // End of the management form.
 echo $renderer->management_form_end();
-echo $renderer->course_search_form($search);
 
 echo $renderer->footer();

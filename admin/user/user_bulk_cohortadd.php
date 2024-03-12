@@ -64,7 +64,8 @@ if (count($cohorts) < 2) {
 }
 
 $countries = get_string_manager()->get_list_of_countries(true);
-$namefields = get_all_user_name_fields(true);
+$userfieldsapi = \core_user\fields::for_name();
+$namefields = $userfieldsapi->get_sql('', false, '', '', false)->selects;
 foreach ($users as $key => $id) {
     $user = $DB->get_record('user', array('id' => $id), 'id, ' . $namefields . ', username,
             email, country, lastaccess, city, deleted');
@@ -138,7 +139,7 @@ foreach ($users as $user) {
             '<a href="' . $CFG->wwwroot . '/user/view.php?id=' . $user->id . '&amp;course=' . SITEID . '">' .
             $user->fullname .
             '</a>',
-            $user->email,
+            s($user->email),
             $user->city,
             $user->country,
             $user->lastaccess ? format_time(time() - $user->lastaccess) : $strnever

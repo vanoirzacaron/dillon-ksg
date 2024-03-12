@@ -144,11 +144,7 @@ function(
             var newValue = values.length ? values.join(',') : 'none';
             var preferences = [
                 {
-                    type: 'message_provider_moodle_instantmessage_loggedoff',
-                    value: newValue
-                },
-                {
-                    type: 'message_provider_moodle_instantmessage_loggedin',
+                    type: 'message_provider_moodle_instantmessage_enabled',
                     value: newValue
                 }
             ];
@@ -219,7 +215,7 @@ function(
                                     // Consider the the processor enabled if either preference is set. This is
                                     // for backwards compatibility. Going forward they will be treated as one
                                     // setting.
-                                    var checked = processor.loggedin.checked || processor.loggedoff.checked;
+                                    var checked = processor.enabled;
                                     return {
                                         displayname: processor.displayname,
                                         name: processor.name,
@@ -264,12 +260,14 @@ function(
      * Initialise the settings page by adding event listeners to
      * the checkboxes.
      *
+     * @param {string} namespace The route namespace.
      * @param {Object} header The settings header element.
      * @param {Object} body The settings body element.
+     * @param {Object} footer The footer body element.
      * @param {Number} loggedInUserId The logged in user id.
      * @return {Object} jQuery promise
      */
-    var show = function(header, body, loggedInUserId) {
+    var show = function(namespace, header, body, footer, loggedInUserId) {
         if (!body.attr('data-init')) {
             init(body, loggedInUserId);
             body.attr('data-init', true);

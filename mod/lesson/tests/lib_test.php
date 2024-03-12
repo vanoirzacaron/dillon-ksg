@@ -22,6 +22,10 @@
  * @copyright  2017 Jun Pataleta
  * @license    http://www.gnu.org/copyleft/gpl.html GNU Public License
  */
+namespace mod_lesson;
+
+use lesson;
+use mod_lesson_external;
 
 defined('MOODLE_INTERNAL') || die();
 
@@ -34,7 +38,7 @@ require_once($CFG->dirroot . '/mod/lesson/lib.php');
  * @copyright  2017 Jun Pataleta
  * @license    http://www.gnu.org/copyleft/gpl.html GNU Public License
  */
-class mod_lesson_lib_testcase extends advanced_testcase {
+class lib_test extends \advanced_testcase {
     /**
      * Test for lesson_get_group_override_priorities().
      */
@@ -91,7 +95,7 @@ class mod_lesson_lib_testcase extends advanced_testcase {
 
         $this->resetAfterTest();
         $this->setAdminUser();
-        $course = new stdClass();
+        $course = new \stdClass();
         $course->groupmode = SEPARATEGROUPS;
         $course->groupmodeforce = true;
         $course = $this->getDataGenerator()->create_course($course);
@@ -123,7 +127,7 @@ class mod_lesson_lib_testcase extends advanced_testcase {
         // Convert to a lesson object.
         $lesson = new lesson($lessonmodule);
         $cm = $lesson->cm;
-        $cm = cm_info::create($cm);
+        $cm = \cm_info::create($cm);
 
         // Check that upon creation, the updates are only about the new configuration created.
         $onehourago = time() - HOURSECS;
@@ -207,7 +211,7 @@ class mod_lesson_lib_testcase extends advanced_testcase {
 
         // Now, teacher can't access all groups.
         groups_add_member($group1, $teacherg1);
-        assign_capability('moodle/site:accessallgroups', CAP_PROHIBIT, $teacherrole->id, context_module::instance($cm->id));
+        assign_capability('moodle/site:accessallgroups', CAP_PROHIBIT, $teacherrole->id, \context_module::instance($cm->id));
         accesslib_clear_all_caches_for_unit_testing();
         $updates = lesson_check_updates_since($cm, $onehourago);
         // I will see only the studentg1 updates.
@@ -648,6 +652,71 @@ class mod_lesson_lib_testcase extends advanced_testcase {
         $this->assertNull($action);
     }
 
+    public function test_lesson_core_calendar_provide_event_action_already_completed() {
+        $this->resetAfterTest();
+        set_config('enablecompletion', 1);
+        $this->setAdminUser();
+
+        // Create the activity.
+        $course = $this->getDataGenerator()->create_course(array('enablecompletion' => 1));
+        $lesson = $this->getDataGenerator()->create_module('lesson', array('course' => $course->id),
+            array('completion' => 2, 'completionview' => 1, 'completionexpected' => time() + DAYSECS));
+
+        // Get some additional data.
+        $cm = get_coursemodule_from_instance('lesson', $lesson->id);
+
+        // Create a calendar event.
+        $event = $this->create_action_event($course->id, $lesson->id,
+            \core_completion\api::COMPLETION_EVENT_TYPE_DATE_COMPLETION_EXPECTED);
+
+        // Mark the activity as completed.
+        $completion = new \completion_info($course);
+        $completion->set_module_viewed($cm);
+
+        // Create an action factory.
+        $factory = new \core_calendar\action_factory();
+
+        // Decorate action event.
+        $actionevent = mod_lesson_core_calendar_provide_event_action($event, $factory);
+
+        // Ensure result was null.
+        $this->assertNull($actionevent);
+    }
+
+    public function test_lesson_core_calendar_provide_event_action_already_completed_for_user() {
+        $this->resetAfterTest();
+        set_config('enablecompletion', 1);
+        $this->setAdminUser();
+
+        // Create the activity.
+        $course = $this->getDataGenerator()->create_course(array('enablecompletion' => 1));
+        $lesson = $this->getDataGenerator()->create_module('lesson', array('course' => $course->id),
+            array('completion' => 2, 'completionview' => 1, 'completionexpected' => time() + DAYSECS));
+
+        // Enrol a student in the course.
+        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
+
+        // Get some additional data.
+        $cm = get_coursemodule_from_instance('lesson', $lesson->id);
+
+        // Create a calendar event.
+        $event = $this->create_action_event($course->id, $lesson->id,
+            \core_completion\api::COMPLETION_EVENT_TYPE_DATE_COMPLETION_EXPECTED);
+
+        // Mark the activity as completed for the student.
+        $completion = new \completion_info($course);
+        $completion->set_module_viewed($cm, $student->id);
+
+        // Create an action factory.
+        $factory = new \core_calendar\action_factory();
+
+        // Decorate action event for the student.
+        $actionevent = mod_lesson_core_calendar_provide_event_action($event, $factory, $student->id);
+
+        // Ensure result was null.
+        $this->assertNull($actionevent);
+    }
+
     /**
      * Creates an action event.
      *
@@ -657,7 +726,7 @@ class mod_lesson_lib_testcase extends advanced_testcase {
      * @return bool|calendar_event
      */
     private function create_action_event($courseid, $instanceid, $eventtype) {
-        $event = new stdClass();
+        $event = new \stdClass();
         $event->name = 'Calendar event';
         $event->modulename  = 'lesson';
         $event->courseid = $courseid;
@@ -665,7 +734,7 @@ class mod_lesson_lib_testcase extends advanced_testcase {
         $event->type = CALENDAR_EVENT_TYPE_ACTION;
         $event->eventtype = $eventtype;
         $event->timestart = time();
-        return calendar_event::create($event);
+        return \calendar_event::create($event);
     }
 
     /**
@@ -691,13 +760,13 @@ class mod_lesson_lib_testcase extends advanced_testcase {
             'completionendreached' => 0,
             'completiontimespent' => 0
         ]);
-        $cm1 = cm_info::create(get_coursemodule_from_instance('lesson', $lesson1->id));
-        $cm2 = cm_info::create(get_coursemodule_from_instance('lesson', $lesson2->id));
+        $cm1 = \cm_info::create(get_coursemodule_from_instance('lesson', $lesson1->id));
+        $cm2 = \cm_info::create(get_coursemodule_from_instance('lesson', $lesson2->id));
 
         // Data for the stdClass input type.
         // This type of input would occur when checking the default completion rules for an activity type, where we don't have
         // any access to cm_info, rather the input is a stdClass containing completion and customdata attributes, just like cm_info.
-        $moddefaults = new stdClass();
+        $moddefaults = new \stdClass();
         $moddefaults->customdata = ['customcompletionrules' => [
             'completionendreached' => 1,
             'completiontimespent' => 3600
@@ -711,7 +780,7 @@ class mod_lesson_lib_testcase extends advanced_testcase {
         $this->assertEquals(mod_lesson_get_completion_active_rule_descriptions($cm1), $activeruledescriptions);
         $this->assertEquals(mod_lesson_get_completion_active_rule_descriptions($cm2), []);
         $this->assertEquals(mod_lesson_get_completion_active_rule_descriptions($moddefaults), $activeruledescriptions);
-        $this->assertEquals(mod_lesson_get_completion_active_rule_descriptions(new stdClass()), []);
+        $this->assertEquals(mod_lesson_get_completion_active_rule_descriptions(new \stdClass()), []);
     }
 
     /**
@@ -1002,7 +1071,7 @@ class mod_lesson_lib_testcase extends advanced_testcase {
     public function test_creation_with_no_calendar_capabilities() {
         $this->resetAfterTest();
         $course = self::getDataGenerator()->create_course();
-        $context = context_course::instance($course->id);
+        $context = \context_course::instance($course->id);
         $user = self::getDataGenerator()->create_and_enrol($course, 'editingteacher');
         $roleid = self::getDataGenerator()->create_role();
         self::getDataGenerator()->role_assign($roleid, $user->id, $context->id);

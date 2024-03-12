@@ -36,18 +36,28 @@ echo $OUTPUT->doctype() ?>
 </head>
 
 <body <?php echo $OUTPUT->body_attributes(); ?>>
-<?php echo $OUTPUT->standard_top_of_body_html() ?>
-<div id="page">
-    <div id="page-content" class="clearfix">
-        <?php echo $OUTPUT->main_content(); ?>
+<?php
+echo $OUTPUT->standard_top_of_body_html();
+$fakeblocks = $OUTPUT->blocks('side-pre', array(), 'aside', true);
+$hasfakeblocks = strpos($fakeblocks, 'data-block="_fake"') !== false;
+?>
+<div id="page-wrapper">
+<?php
+echo '<div id="page"';
+if ($hasfakeblocks) {
+    echo ' class="has-fake-blocks"';
+}
+echo '>';
+if ($hasfakeblocks) {
+    echo '<section class="embedded-blocks" aria-label="'.get_string('blocks').'">';
+    echo $fakeblocks;
+    echo '</section>';
+}
+?>
+        <section class="embedded-main">
+            <?php echo $OUTPUT->main_content(); ?>
+        </section>
     </div>
 </div>
-<?php echo $OUTPUT->standard_end_of_body_html() ?>
-<script type="text/javascript">
-    require(['theme_boost/loader']);
-</script>
-<script type="text/javascript">
-    <?php echo $PAGE->theme->settings->jssection;?>
-</script>
-</body>
-</html>
+<?php
+require_once(dirname(__FILE__) . '/includes/nofooter.php');

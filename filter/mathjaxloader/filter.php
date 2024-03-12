@@ -85,12 +85,7 @@ class filter_mathjaxloader extends moodle_text_filter {
             $lang = $this->map_language_code(current_language());
             $url = new moodle_url($url, array('delayStartupUntil' => 'configured'));
 
-            $moduleconfig = array(
-                'name' => 'mathjax',
-                'fullpath' => $url
-            );
-
-            $page->requires->js_module($moduleconfig);
+            $page->requires->js($url);
 
             $config = get_config('filter_mathjaxloader', 'mathjaxconfig');
             $wwwroot = new moodle_url('/');
@@ -99,7 +94,7 @@ class filter_mathjaxloader extends moodle_text_filter {
 
             $params = array('mathjaxconfig' => $config, 'lang' => $lang);
 
-            $page->requires->yui_module('moodle-filter_mathjaxloader-loader', 'M.filter_mathjaxloader.configure', array($params));
+            $page->requires->js_call_amd('filter_mathjaxloader/loader', 'configure', [$params]);
         }
     }
 
@@ -140,7 +135,13 @@ class filter_mathjaxloader extends moodle_text_filter {
         if ($hasextra) {
             // If custom dilimeters are used, wrap whole text to prevent autolinking.
             $text = '<span class="nolink">' . $text . '</span>';
-        } else {
+        } else if (preg_match('/\\\\[[(]/', $text) || preg_match('/\$\$/', $text)) {
+            // Only parse the text if there are mathjax symbols in it. The recognized
+            // math environments are \[ \] and $$ $$ for display mathematics and \( \)
+            // for inline mathematics.
+            // Note: 2 separate regexes seems to perform better here than using a single
+            // regex with groupings.
+
             // Wrap display and inline math environments in nolink spans.
             // Do not wrap nested environments, i.e., if inline math is nested
             // inside display math, only the outer display math is wrapped in
@@ -150,7 +151,7 @@ class filter_mathjaxloader extends moodle_text_filter {
         }
 
         if ($hasdisplayorinline || $hasextra) {
-            $PAGE->requires->yui_module('moodle-filter_mathjaxloader-loader', 'M.filter_mathjaxloader.typeset');
+            $PAGE->requires->js_call_amd('filter_mathjaxloader/loader', 'typeset');
             return '<span class="filter_mathjaxloader_equation">' . $text . '</span>';
         }
         return $text;

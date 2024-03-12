@@ -14,16 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * This file contains the moodle format implementation of the content writer.
- *
- * @package core_privacy
- * @copyright 2018 Andrew Nicols <andrew@nicols.co.uk>
- * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- */
 namespace core_privacy\local\request;
-
-defined('MOODLE_INTERNAL') || die();
 
 /**
  * The moodle_content_writer is the default Moodle implementation of a content writer.
@@ -33,6 +24,7 @@ defined('MOODLE_INTERNAL') || die();
  *
  * Objects of data are stored as JSON.
  *
+ * @package core_privacy
  * @copyright 2018 Andrew Nicols <andrew@nicols.co.uk>
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -139,11 +131,8 @@ class moodle_content_writer implements content_writer {
      * @return  content_writer
      */
     public function export_related_data(array $subcontext, $name, $data) : content_writer {
-        $path = $this->get_path($subcontext, "{$name}.json");
-
-        $this->write_data($path, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-
-        return $this;
+        return $this->export_custom_file($subcontext, "{$name}.json",
+            json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
     }
 
     /**
@@ -171,7 +160,10 @@ class moodle_content_writer implements content_writer {
      * @param   string          $text       The text to be processed
      * @return  string                      The processed string
      */
-    public function rewrite_pluginfile_urls(array $subcontext, $component, $filearea, $itemid, $text) : string {
+    public function rewrite_pluginfile_urls(array $subcontext, $component, $filearea, $itemid, $text): string {
+        if ($text === null || $text === '') {
+            return '';
+        }
         // Need to take into consideration the subcontext to provide the full path to this file.
         $subcontextpath = '';
         if (!empty($subcontext)) {
@@ -297,11 +289,18 @@ class moodle_content_writer implements content_writer {
                     }
                     return $value;
                 }, $newpath);
-                return implode(DIRECTORY_SEPARATOR, $newpath);
+                $data = implode(DIRECTORY_SEPARATOR, $newpath);
             } else if (is_numeric($data)) {
                 $data = '_' . $data;
             }
-            return $data;
+            // Because clean_param() normalises separators to forward-slashes
+            // and because there is code DIRECTORY_SEPARATOR dependent after
+            // this array_map(), we ensure we get the original separator.
+            // Note that maybe we could leave the clean_param() alone, but
+            // surely that means that the DIRECTORY_SEPARATOR dependent
+            // code is not needed at all. So better keep existing behavior
+            // until this is revisited.
+            return str_replace('/', DIRECTORY_SEPARATOR, clean_param($data, PARAM_PATH));
         }, $subcontext);
 
         // Combine the context path, and the subcontext data.
@@ -623,8 +622,8 @@ class moodle_content_writer implements content_writer {
         $targetpath = ['js', 'general.js'];
         $this->copy_data($jspath, $targetpath);
 
-        $jquery = ['lib', 'jquery', 'jquery-3.2.1.min.js'];
-        $jquerydestination = ['js', 'jquery-3.2.1.min.js'];
+        $jquery = ['lib', 'jquery', 'jquery-3.7.1.min.js'];
+        $jquerydestination = ['js', 'jquery-3.7.1.min.js'];
         $this->copy_data($jquery, $jquerydestination);
 
         $requirecurrentpath = ['lib', 'requirejs', 'require.min.js'];
@@ -665,7 +664,7 @@ class moodle_content_writer implements content_writer {
         $navigationpage = new \core_privacy\output\exported_navigation_page(current($richtree));
         $navigationhtml = $output->render_navigation($navigationpage);
 
-        $systemname = $SITE->fullname;
+        $systemname = format_string($SITE->fullname, true, ['context' => \context_system::instance()]);
         $fullusername = fullname($USER);
         $siteurl = $CFG->wwwroot;
 

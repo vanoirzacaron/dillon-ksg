@@ -26,13 +26,18 @@
  */
 
 require_once(__DIR__ . '/../../../config.php');
-require_once($CFG->libdir . '/externallib.php');
 
 $serviceshortname  = required_param('service',  PARAM_ALPHANUMEXT);
 $passport          = required_param('passport',  PARAM_RAW);    // Passport send from the app to validate the response URL.
 $urlscheme         = optional_param('urlscheme', 'moodlemobile', PARAM_NOTAGS); // The URL scheme the app supports.
 $confirmed         = optional_param('confirmed', false, PARAM_BOOL);  // If we are being redirected after user confirmation.
 $oauthsso          = optional_param('oauthsso', 0, PARAM_INT); // Id of the OpenID issuer (for OAuth direct SSO).
+
+// Validate that the urlscheme is valid.
+if (!preg_match('/^[a-zA-Z][a-zA-Z0-9-\+\.]*$/', $urlscheme)) {
+    throw new moodle_exception('Invalid parameter: the value of urlscheme isn\'t valid. ' .
+            'It should start with a letter and can only contain letters, numbers and the characters "." "+" "-".');
+}
 
 // Check web services enabled.
 if (!$CFG->enablewebservices) {
@@ -51,8 +56,9 @@ if (!empty($oauthsso) && is_enabled_auth('oauth2')) {
 
 // Check if the plugin is properly configured.
 $typeoflogin = get_config('tool_mobile', 'typeoflogin');
-if (empty($SESSION->justloggedin) and
-        $typeoflogin != tool_mobile\api::LOGIN_VIA_BROWSER and
+if (empty($SESSION->justloggedin) &&
+        !is_enabled_auth('oauth2') &&
+        $typeoflogin != tool_mobile\api::LOGIN_VIA_BROWSER &&
         $typeoflogin != tool_mobile\api::LOGIN_VIA_EMBEDDED_BROWSER) {
     throw new moodle_exception('pluginnotenabledorconfigured', 'tool_mobile');
 }
@@ -70,9 +76,9 @@ core_user::require_active_user($USER);
 
 // Get an existing token or create a new one.
 $timenow = time();
-$token = external_generate_token_for_current_user($service);
+$token = \core_external\util::generate_token_for_current_user($service);
 $privatetoken = $token->privatetoken;
-external_log_token_request($token);
+\core_external\util::log_token_request($token);
 
 // Don't return the private token if the user didn't just log in and a new token wasn't created.
 if (empty($SESSION->justloggedin) and $token->timecreated < $timenow) {

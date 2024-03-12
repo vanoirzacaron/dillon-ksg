@@ -278,7 +278,7 @@ class page_agreedocs implements renderable, templatable {
             $cache = \cache::make('core', 'presignup');
             $cachekey = 'tool_policy_viewedpolicies';
 
-            $viewedpolicies = $cache->get($cachekey);
+            $viewedpolicies = $cache->get($cachekey) ?: [];
             if (!empty($viewedpolicies)) {
                 // Get the list of the policies docs which the user haven't viewed during this session.
                 $pendingpolicies = array_diff($currentpolicyversionids, $viewedpolicies);
@@ -301,6 +301,8 @@ class page_agreedocs implements renderable, templatable {
                 redirect(new moodle_url('/admin/tool/policy/view.php', $urlparams));
             }
         } else {
+            // Update the policyagreed for the user to avoid infinite loop because there are no policies to-be-accepted.
+            api::update_policyagreed($userid);
             $this->redirect_to_previous_url();
         }
     }

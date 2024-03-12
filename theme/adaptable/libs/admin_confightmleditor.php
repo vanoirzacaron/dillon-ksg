@@ -24,8 +24,6 @@
  *
  */
 
-defined('MOODLE_INTERNAL') || die;
-
 /**
  * @copyright 2015 Jeremy Hopkins (Coventry University)
  * @copyright 2015 Fernando Acedo (3-bits.com)
@@ -68,19 +66,21 @@ class adaptable_setting_confightmleditor extends admin_setting_configtext {
         $this->rows = $rows;
         $this->cols = $cols;
         $this->filearea = $filearea;
+        $this->nosave = (during_initial_install() || CLI_SCRIPT);
         parent::__construct($name, $visiblename, $description, $defaultsetting, $paramtype);
         editors_head_setup();
     }
 
     /**
-     * get options
+     * Gets the file area options.
+     *
+     * @param context_user $ctx
+     * @return array
      */
-    private function get_options() {
-        global $USER;
-
+    private function get_options(context_user $ctx) {
         $default = array();
         $default['noclean'] = false;
-        $default['context'] = context_user::instance($USER->id);
+        $default['context'] = $ctx;
         $default['maxbytes'] = 0;
         $default['maxfiles'] = -1;
         $default['forcehttps'] = false;
@@ -100,18 +100,23 @@ class adaptable_setting_confightmleditor extends admin_setting_configtext {
      * @return string XHTML string for the editor
      */
     public function output_html($data, $query='') {
-        global $USER;
+        if (PHPUNIT_TEST) {
+            $userid = 2;  // Admin user.
+        } else {
+            global $USER;
+            $userid = $USER->id;
+        }
 
         $default = $this->get_defaultsetting();
 
         $defaultinfo = $default;
-        if (!is_null($default) and $default !== '') {
+        if (!is_null($default) && $default !== '') {
             $defaultinfo = "\n".$default;
         }
 
-        $ctx = context_user::instance($USER->id);
+        $ctx = context_user::instance($userid);
         $editor = editors_get_preferred_editor(FORMAT_HTML);
-        $options = $this->get_options();
+        $options = $this->get_options($ctx);
         $draftitemid = file_get_unused_draft_itemid();
         $component = is_null($this->plugin) ? 'core' : $this->plugin;
         $data = file_prepare_draft_area($draftitemid, $options['context']->id,
@@ -141,8 +146,8 @@ class adaptable_setting_confightmleditor extends admin_setting_configtext {
         $mediaoptions = initialise_filepicker($args);
         $mediaoptions->context = $ctx;
         $mediaoptions->client_id = uniqid();
-        $mediaoptions->maxbytes  = $options['maxbytes'];
-        $mediaoptions->areamaxbytes  = $options['areamaxbytes'];
+        $mediaoptions->maxbytes = $options['maxbytes'];
+        $mediaoptions->areamaxbytes = $options['areamaxbytes'];
         $mediaoptions->env = 'editor';
         $mediaoptions->itemid = $draftitemid;
 
@@ -151,8 +156,8 @@ class adaptable_setting_confightmleditor extends admin_setting_configtext {
         $linkoptions = initialise_filepicker($args);
         $linkoptions->context = $ctx;
         $linkoptions->client_id = uniqid();
-        $linkoptions->maxbytes  = $options['maxbytes'];
-        $linkoptions->areamaxbytes  = $options['areamaxbytes'];
+        $linkoptions->maxbytes = $options['maxbytes'];
+        $linkoptions->areamaxbytes = $options['areamaxbytes'];
         $linkoptions->env = 'editor';
         $linkoptions->itemid = $draftitemid;
 
@@ -173,14 +178,23 @@ class adaptable_setting_confightmleditor extends admin_setting_configtext {
     }
 
     /**
-     * Handle file writes to repository
+     * Writes the setting to the database.
      *
-     * @param string $data
+     * @param mixed $data
+     * @return string
+     * @throws coding_exception
+     * @throws dml_exception
+     * @throws file_exception
+     * @throws stored_file_creation_exception
      */
     public function write_setting($data) {
-        global $CFG;
+        global $CFG, $USER;
 
-        if ($this->paramtype === PARAM_INT and $data === '') {
+        if ($this->nosave) {
+            return '';
+        }
+
+        if ($this->paramtype === PARAM_INT && $data === '') {
             // ... do not complain if '' used instead of 0 !
             $data = 0;
         }
@@ -190,7 +204,7 @@ class adaptable_setting_confightmleditor extends admin_setting_configtext {
             return $validated;
         }
 
-        $options = $this->get_options();
+        $options = $this->get_options(context_user::instance($USER->id));
         $fs = get_file_storage();
         $component = is_null($this->plugin) ? 'core' : $this->plugin;
         $wwwroot = $CFG->wwwroot;
@@ -198,11 +212,14 @@ class adaptable_setting_confightmleditor extends admin_setting_configtext {
             $wwwroot = str_replace('http://', 'https://', $wwwroot);
         }
 
-        if (!empty($_REQUEST[$this->get_full_name().'_draftitemid'])) {
-            $draftitemid = $_REQUEST[$this->get_full_name().'_draftitemid'];
-        } else {
+        $draftitemidname = sprintf('%s_draftitemid', $this->get_full_name());
+        if (PHPUNIT_TEST || !isset($_REQUEST[$draftitemidname])) {
             $draftitemid = 0;
+        } else {
+            $draftitemid = $_REQUEST[$draftitemidname];
         }
+
+        $hasfiles = false;
         $draftfiles = $fs->get_area_files($options['context']->id, 'user', 'draft', $draftitemid, 'id');
         foreach ($draftfiles as $file) {
             if (!$file->is_directory()) {
@@ -232,10 +249,16 @@ class adaptable_setting_confightmleditor extends admin_setting_configtext {
                                                            $filerec->get_filepath(),
                                                            $filerec->get_filename());
                     $data = str_ireplace($strtosearch, $url, $data);
+                    $hasfiles = true;
                 }
             }
         }
+        if (!$hasfiles) {
+            if (trim(html_to_text($data)) === '') {
+                $data = '';
+            }
+        }
 
-        return ($this->config_write($this->name, format_text($data, FORMAT_HTML)) ? '' : get_string('errorsetting', 'admin'));
+        return ($this->config_write($this->name, $data) ? '' : get_string('errorsetting', 'admin'));
     }
 }

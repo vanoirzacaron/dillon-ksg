@@ -21,6 +21,7 @@
  * @copyright 2015-2019 Jeremy Hopkins (Coventry University)
  * @copyright 2015-2019 Fernando Acedo (3-bits.com)
  * @copyright 2017-2019 Manoj Solanki (Coventry University)
+ * @copyright 2019-onwards G J Barnard - {@link http://moodle.org/user/profile.php?id=442195}
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  *
  */
@@ -31,18 +32,19 @@ defined('MOODLE_INTERNAL') || die;
 $plugin->component = 'theme_adaptable';
 
 // Adaptable version date (YYYYMMDDrr where rr is the release number).
-$plugin->version   = 2019112608;
+$plugin->version = 2022112306;
 
-// Moodle required version is 3.6.
-$plugin->requires  = 2018120301.00; // Moodle 3.6.1 (Build: 20181205).
+$plugin->requires = 2022112800.00; // 4.1 (Build: 20221128).
+
+$plugin->supported = array(401, 401);
 
 // Adaptable version using SemVer (https://semver.org).
-$plugin->release = '2.2.4';
+$plugin->release = '401.1.5';
 
 // Adaptable maturity (do not use ALPHA or BETA versions in production sites).
 $plugin->maturity = MATURITY_STABLE;
 
 // Adaptable dependencies (Only Boost as it's the parent theme).
 $plugin->dependencies = array(
-    'theme_boost' => 2018120300
+    'theme_boost' => 2022112800
 );

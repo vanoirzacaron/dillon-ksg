@@ -24,7 +24,7 @@
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
+use core_external\external_value;
 
 // File areas for file submission assignment.
 define('ASSIGNSUBMISSION_FILE_MAXSUMMARYFILES', 5);
@@ -90,7 +90,7 @@ class assign_submission_file extends assign_submission_plugin {
                               'maxfilessubmission',
                               'assignsubmission_file');
         $mform->setDefault('assignsubmission_file_maxfiles', $defaultmaxfilesubmissions);
-        $mform->disabledIf('assignsubmission_file_maxfiles', 'assignsubmission_file_enabled', 'notchecked');
+        $mform->hideIf('assignsubmission_file_maxfiles', 'assignsubmission_file_enabled', 'notchecked');
 
         $choices = get_max_upload_sizes($CFG->maxbytes,
                                         $COURSE->maxbytes,
@@ -108,7 +108,7 @@ class assign_submission_file extends assign_submission_plugin {
                               'maximumsubmissionsize',
                               'assignsubmission_file');
         $mform->setDefault('assignsubmission_file_maxsizebytes', $defaultmaxsubmissionsizebytes);
-        $mform->disabledIf('assignsubmission_file_maxsizebytes',
+        $mform->hideIf('assignsubmission_file_maxsizebytes',
                            'assignsubmission_file_enabled',
                            'notchecked');
 
@@ -116,7 +116,7 @@ class assign_submission_file extends assign_submission_plugin {
         $mform->addElement('filetypes', 'assignsubmission_file_filetypes', $name);
         $mform->addHelpButton('assignsubmission_file_filetypes', 'acceptedfiletypes', 'assignsubmission_file');
         $mform->setDefault('assignsubmission_file_filetypes', $defaultfiletypes);
-        $mform->disabledIf('assignsubmission_file_filetypes', 'assignsubmission_file_enabled', 'notchecked');
+        $mform->hideIf('assignsubmission_file_filetypes', 'assignsubmission_file_enabled', 'notchecked');
     }
 
     /**
@@ -308,6 +308,30 @@ class assign_submission_file extends assign_submission_plugin {
     }
 
     /**
+     * Remove files from this submission.
+     *
+     * @param stdClass $submission The submission
+     * @return boolean
+     */
+    public function remove(stdClass $submission) {
+        global $DB;
+        $fs = get_file_storage();
+
+        $fs->delete_area_files($this->assignment->get_context()->id,
+                               'assignsubmission_file',
+                               ASSIGNSUBMISSION_FILE_FILEAREA,
+                               $submission->id);
+
+        $currentsubmission = $this->get_file_submission($submission->id);
+        if ($currentsubmission) {
+            $currentsubmission->numfiles = 0;
+            $DB->update_record('assignsubmission_file', $currentsubmission);
+        }
+
+        return true;
+    }
+
+    /**
      * Produce a list of files suitable for export that represent this feedback or submission
      *
      * @param stdClass $submission The submission
@@ -486,19 +510,6 @@ class assign_submission_file extends assign_submission_plugin {
     }
 
     /**
-     * Formatting for log info
-     *
-     * @param stdClass $submission The submission
-     * @return string
-     */
-    public function format_for_log(stdClass $submission) {
-        // Format the info for each submission plugin (will be added to log).
-        $filecount = $this->count_files($submission->id, ASSIGNSUBMISSION_FILE_FILEAREA);
-
-        return get_string('numfilesforlog', 'assignsubmission_file', $filecount);
-    }
-
-    /**
      * Return true if there are no submission files
      * @param stdClass $submission
      */
@@ -571,7 +582,7 @@ class assign_submission_file extends assign_submission_plugin {
     /**
      * Return a description of external params suitable for uploading a file submission from a webservice.
      *
-     * @return external_description|null
+     * @return \core_external\external_description|null
      */
     public function get_external_parameters() {
         return array(
@@ -614,5 +625,13 @@ class assign_submission_file extends assign_submission_plugin {
         $sets = $util->normalize_file_types($typeslist);
 
         return $sets;
+    }
+
+    /**
+     * Determine if the plugin allows image file conversion
+     * @return bool
+     */
+    public function allow_image_conversion() {
+        return true;
     }
 }

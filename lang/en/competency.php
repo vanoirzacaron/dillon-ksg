@@ -103,10 +103,10 @@ $string['evidence_manualoverrideincourse'] = 'The competency rating was manually
 $string['evidence_manualoverrideinplan'] = 'The competency rating was manually set in the learning plan \'{$a}\'.';
 $string['invalidevidencedesc'] = 'Invalid evidence description';
 $string['invalidgrade'] = 'Invalid rating';
-$string['invalidpersistenterror'] = 'Error: {$a}';
 $string['invalidplan'] = 'Invalid learning plan';
 $string['invalidtaxonomy'] = 'Invalid taxonomy: {$a}';
 $string['invalidurl'] = 'The URL is not valid. Make sure it starts with \'http://\' or \'https://\'.';
+$string['nouserplanswithcompetency'] = 'No learning plans contain this competency.';
 $string['planstatusactive'] = 'Active';
 $string['planstatuscomplete'] = 'Complete';
 $string['planstatusdraft'] = 'Draft';
@@ -200,3 +200,6 @@ $string['usercompetencystatus_idle'] = 'Idle';
 $string['usercompetencystatus_inreview'] = 'In review';
 $string['usercompetencystatus_waitingforreview'] = 'Waiting for review';
 $string['userplans'] = 'Learning plans';
+
+// Deprecated since Moodle 4.0.
+$string['invalidpersistenterror'] = 'Error: {$a}';

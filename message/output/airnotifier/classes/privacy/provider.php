@@ -68,7 +68,7 @@ class provider implements
                 'smallmessage' => 'privacy:metadata:smallmessage',
                 'fullmessage' => 'privacy:metadata:fullmessage'
         ], 'privacy:metadata:externalpurpose');
-        // This system is unaware of user preferences such as message_provider_moodle_instantmessage_loggedin.
+        // This system is unaware of user preferences such as message_provider_moodle_instantmessage_enabled.
         return $collection;
     }
 
@@ -105,20 +105,11 @@ class provider implements
             return;
         }
 
-        $params = [
-            'contextid' => $context->id,
-            'contextuser' => CONTEXT_USER,
-        ];
-
-        $sql = "SELECT ud.userid as userid
+        $sql = "SELECT ud.userid
                   FROM {message_airnotifier_devices} mad
-                  JOIN {user_devices} ud
-                       ON ud.id = mad.userdeviceid
-                  JOIN {context} ctx
-                       ON ctx.instanceid = ud.userid
-                       AND ctx.contextlevel = :contextuser
-                 WHERE ctx.id = :contextid";
-
+                  JOIN {user_devices} ud ON ud.id = mad.userdeviceid
+                 WHERE ud.userid = ?";
+        $params = [$context->instanceid];
         $userlist->add_from_sql('userid', $sql, $params);
     }
 

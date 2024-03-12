@@ -71,6 +71,9 @@ class data_requests_table extends table_sql {
     /** @var int[] The available options for the number of data request to be displayed per page. */
     protected $perpageoptions = [25, 50, 100, 250];
 
+    /** @var int[] The request creation method filters. */
+    protected array $creationmethods = [];
+
     /**
      * data_requests_table constructor.
      *
@@ -116,9 +119,17 @@ class data_requests_table extends table_sql {
      *
      * @param stdClass $data The row data.
      * @return string
+     * @throws \moodle_exception
+     * @throws coding_exception
      */
     public function col_select($data) {
         if ($data->status == \tool_dataprivacy\api::DATAREQUEST_STATUS_AWAITING_APPROVAL) {
+            if ($data->type == \tool_dataprivacy\api::DATAREQUEST_TYPE_DELETE
+                && !api::can_create_data_deletion_request_for_other()) {
+                // Don't show checkbox if request's type is delete and user don't have permission.
+                return false;
+            }
+
             $stringdata = [
                 'username' => $data->foruser->fullname,
                 'requesttype' => \core_text::strtolower($data->typenameshort)
@@ -182,7 +193,7 @@ class data_requests_table extends table_sql {
      * @return mixed
      */
     public function col_status($data) {
-        return html_writer::span($data->statuslabel, 'label ' . $data->statuslabelclass);
+        return html_writer::span($data->statuslabel, 'badge ' . $data->statuslabelclass);
     }
 
     /**
@@ -206,13 +217,18 @@ class data_requests_table extends table_sql {
 
         $requestid = $data->id;
         $status = $data->status;
+        $persistent = $this->datarequests[$requestid];
 
         // Prepare actions.
         $actions = [];
 
         // View action.
         $actionurl = new moodle_url('#');
-        $actiondata = ['data-action' => 'view', 'data-requestid' => $requestid];
+        $actiondata = [
+            'data-action' => 'view',
+            'data-requestid' => $requestid,
+            'data-contextid' => \context_system::instance()->id,
+        ];
         $actiontext = get_string('viewrequest', 'tool_dataprivacy');
         $actions[] = new action_menu_link_secondary($actionurl, null, $actiontext, $actiondata);
 
@@ -232,10 +248,27 @@ class data_requests_table extends table_sql {
                 }
                 break;
             case api::DATAREQUEST_STATUS_AWAITING_APPROVAL:
+                // Only show "Approve" and "Deny" button for deletion request if current user has permission.
+                if ($persistent->get('type') == api::DATAREQUEST_TYPE_DELETE &&
+                    !api::can_create_data_deletion_request_for_other()) {
+                    break;
+                }
                 // Approve.
                 $actiondata['data-action'] = 'approve';
-                $actiontext = get_string('approverequest', 'tool_dataprivacy');
-                $actions[] = new action_menu_link_secondary($actionurl, null, $actiontext, $actiondata);
+
+                if (get_config('tool_dataprivacy', 'allowfiltering') && $data->type == api::DATAREQUEST_TYPE_EXPORT) {
+                    $actiontext = get_string('approverequestall', 'tool_dataprivacy');
+                    $actions[] = new action_menu_link_secondary($actionurl, null, $actiontext, $actiondata);
+
+                    // Approve selected courses.
+                    $actiontext = get_string('filterexportdata', 'tool_dataprivacy');
+                    $actiondata = ['data-action' => 'approve-selected-courses', 'data-requestid' => $requestid,
+                        'data-contextid' => \context_system::instance()->id];
+                    $actions[] = new \action_menu_link_secondary($actionurl, null, $actiontext, $actiondata);
+                } else {
+                    $actiontext = get_string('approverequest', 'tool_dataprivacy');
+                    $actions[] = new action_menu_link_secondary($actionurl, null, $actiontext, $actiondata);
+                }
 
                 // Deny.
                 $actiondata['data-action'] = 'deny';
@@ -253,9 +286,11 @@ class data_requests_table extends table_sql {
         }
 
         if ($this->manage) {
-            $persistent = $this->datarequests[$requestid];
             $canreset = $persistent->is_active() || empty($this->ongoingrequests[$data->foruser->id]->{$data->type});
             $canreset = $canreset && $persistent->is_resettable();
+            // Prevent re-submmit deletion request if current user don't have permission.
+            $canreset = $canreset && ($persistent->get('type') != api::DATAREQUEST_TYPE_DELETE ||
+                    api::can_create_data_deletion_request_for_other());
             if ($canreset) {
                 $reseturl = new moodle_url('/admin/tool/dataprivacy/resubmitrequest.php', [
                         'requestid' => $requestid,
@@ -269,8 +304,7 @@ class data_requests_table extends table_sql {
         $actionsmenu = new action_menu($actions);
         $actionsmenu->set_menu_trigger(get_string('actions'));
         $actionsmenu->set_owner_selector('request-actions-' . $requestid);
-        $actionsmenu->set_alignment(\action_menu::TL, \action_menu::BL);
-        $actionsmenu->set_constraint('[data-region=data-requests-table] > .no-overflow');
+        $actionsmenu->set_boundary('window');
 
         return $OUTPUT->render($actionsmenu);
     }

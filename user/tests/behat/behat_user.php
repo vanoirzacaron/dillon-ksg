@@ -46,14 +46,10 @@ class behat_user extends behat_base {
      * @param string $nodetext The menu item to select.
      */
     public function i_choose_from_the_participants_page_bulk_action_menu($nodetext) {
-        $nodetext = behat_context_helper::escape($nodetext);
-
-        // Open the select.
-        $this->execute("behat_general::i_click_on", array("//select[@id='formactionid']", "xpath_element"));
-
-        // Click on the option.
-        $this->execute("behat_general::i_click_on", array("//select[@id='formactionid']" .
-                                                          "/option[contains(., " . $nodetext . ")]", "xpath_element"));
+        $this->execute("behat_forms::i_set_the_field_to", [
+            "With selected users...",
+            $this->escape($nodetext)
+        ]);
     }
 
     /**
@@ -86,6 +82,62 @@ class behat_user extends behat_base {
         $value = $fld->get_attribute('autocomplete');
         if ($value == $purpose) {
             throw new ExpectationException('The "' . $field . '" field does have purpose "' . $purpose . '"', $this->getSession());
+        }
+    }
+
+    /**
+     * Convert page names to URLs for steps like 'When I am on the "[page name]" page'.
+     *
+     * Recognised page names are:
+     * | Page name            | Description                                                 |
+     * | Contact Site Support | The Contact Site Support page (user/contactsitesupport.php) |
+     *
+     * @param string $page name of the page, with the component name removed e.g. 'Admin notification'.
+     * @return moodle_url the corresponding URL.
+     * @throws Exception with a meaningful error message if the specified page cannot be found.
+     */
+    protected function resolve_page_url(string $page): moodle_url {
+
+        switch (strtolower($page)) {
+            case 'contact site support':
+                return new moodle_url('/user/contactsitesupport.php');
+
+            default:
+                throw new Exception("Unrecognised core_user page type '{$page}'.");
+        }
+    }
+
+    /**
+     * Convert page names to URLs for steps like 'When I am on the "[identifier]" "[page type]" page'.
+     *
+     * Recognised page names are:
+     * | Page Type | Identifier meaning | Description                                |
+     * | editing   | username or email  | User editing page (/user/editadvanced.php) |
+     * | profile   | username or email  | User profile page (/user/profile.php) |
+     *
+     * @param string $type identifies which type of page this is, e.g. 'Editing'.
+     * @param string $identifier identifies the user, e.g. 'student1'.
+     * @return moodle_url the corresponding URL.
+     * @throws Exception with a meaningful error message if the specified page cannot be found.
+     */
+    protected function resolve_page_instance_url(string $type, string $identifier): moodle_url {
+
+        switch (strtolower($type)) {
+            case 'editing':
+                $userid = $this->get_user_id_by_identifier($identifier);
+                if (!$userid) {
+                    throw new Exception('The specified user with username or email "' .
+                        $identifier . '" does not exist');
+                }
+                return new moodle_url('/user/editadvanced.php', ['id' => $userid]);
+            case 'profile':
+                $userid = $this->get_user_id_by_identifier($identifier);
+                if (!$userid) {
+                    throw new Exception('The specified user with username or email "' . $identifier . '" does not exist');
+                }
+                return new moodle_url('/user/profile.php', ['id' => $userid]);
+            default:
+                throw new Exception("Unrecognised page type '{$type}'.");
         }
     }
 }

@@ -81,10 +81,10 @@ class unattached extends base {
      * @param   MoodleQuickForm $mform      The form to add configuration to.
      */
     public static function add_disabled_constraints_to_form(\MoodleQuickForm $mform) {
-        $myvalue = \tool_usertours\target::get_target_constant_for_class(get_class());
+        $myvalue = \tool_usertours\target::get_target_constant_for_class(self::class);
 
         foreach (array_keys(self::$forcedsettings) as $settingname) {
-            $mform->disabledIf($settingname, 'targettype', 'eq', $myvalue);
+            $mform->hideIf($settingname, 'targettype', 'eq', $myvalue);
         }
     }
 

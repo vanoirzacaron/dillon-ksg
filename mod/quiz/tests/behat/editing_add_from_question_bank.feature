@@ -21,30 +21,27 @@ Feature: Adding questions to a quiz from the question bank
       | contextlevel | reference | name           |
       | Course       | C1        | Test questions |
     And the following "questions" exist:
-      | questioncategory | qtype     | name             | user     | questiontext     |
-      | Test questions   | essay     | question 01 name | admin    | Question 01 text |
-      | Test questions   | essay     | question 02 name | teacher1 | Question 02 text |
+      | questioncategory | qtype     | name             | user     | questiontext     | idnumber |
+      | Test questions   | essay     | question 01 name | admin    | Question 01 text |          |
+      | Test questions   | essay     | question 02 name | teacher1 | Question 02 text | qidnum   |
 
   Scenario: The questions can be filtered by tag
-    Given I log in as "teacher1"
-    And I am on "Course 1" course homepage
-    When I navigate to "Question bank > Questions" in current page administration
-    And I click on "Edit" "link" in the "question 01 name" "table_row"
+    Given I am on the "question 01 name" "core_question > edit" page logged in as teacher1
     And I set the following fields to these values:
       | Tags | foo |
     And I press "id_submitbutton"
-    And I click on "Edit" "link" in the "question 02 name" "table_row"
+    And I choose "Edit question" action for "question 02 name" in the question bank
     And I set the following fields to these values:
       | Tags | bar |
     And I press "id_submitbutton"
-    And I am on "Course 1" course homepage
-    And I follow "Quiz 1"
-    And I navigate to "Edit quiz" in current page administration
+    When I am on the "Quiz 1" "mod_quiz > Edit" page
     And I open the "last" add to quiz menu
     And I follow "from question bank"
-    And I set the field "Filter by tags..." to "foo"
-    And I press key "13" in the field "Filter by tags..."
-    Then I should see "question 01 name" in the "categoryquestions" "table"
+    Then I should see "foo" in the "question 01 name" "table_row"
+    And I should see "bar" in the "question 02 name" "table_row"
+    And I should see "qidnum" in the "question 02 name" "table_row"
+    When I apply question bank filter "Tag" with value "foo"
+    And I should see "question 01 name" in the "categoryquestions" "table"
     And I should not see "question 02 name" in the "categoryquestions" "table"
 
   Scenario: The question modal can be paginated
@@ -71,12 +68,70 @@ Feature: Adding questions to a quiz from the question bank
       | Test questions   | essay     | question 21 name | teacher1 | Question 21 text |
       | Test questions   | essay     | question 22 name | teacher1 | Question 22 text |
     And I log in as "teacher1"
-    And I am on "Course 1" course homepage
-    And I follow "Quiz 1"
-    And I navigate to "Edit quiz" in current page administration
+    And I am on the "Quiz 1" "mod_quiz > Edit" page
     And I open the "last" add to quiz menu
     And I follow "from question bank"
     And I click on "2" "link" in the ".pagination" "css_element"
     Then I should see "question 21 name" in the "categoryquestions" "table"
     And I should see "question 22 name" in the "categoryquestions" "table"
     And I should not see "question 01 name" in the "categoryquestions" "table"
+    And I click on "1" "link" in the ".pagination" "css_element"
+    And I should see "question 01 name" in the "categoryquestions" "table"
+
+  Scenario: Questions are added in the right place with multiple sections
+    Given the following "questions" exist:
+      | questioncategory | qtype | name             | questiontext     |
+      | Test questions   | essay | question 03 name | question 03 text |
+    And quiz "Quiz 1" contains the following questions:
+      | question         | page |
+      | question 01 name | 1    |
+      | question 02 name | 2    |
+    And quiz "Quiz 1" contains the following sections:
+      | heading   | firstslot | shuffle |
+      | Section 1 | 1         | 0       |
+      | Section 2 | 2         | 0       |
+    And I log in as "teacher1"
+    And I am on the "Quiz 1" "mod_quiz > Edit" page
+    When I open the "Page 1" add to quiz menu
+    And I follow "from question bank"
+    And I set the field with xpath "//tr[contains(normalize-space(.), 'question 03 name')]//input[@type='checkbox']" to "1"
+    And I click on "Add selected questions to the quiz" "button"
+    Then I should see "question 03 name" on quiz page "1"
+    And I should see "question 01 name" before "question 03 name" on the edit quiz page
+
+  Scenario: Add several selected questions from the question bank
+    Given I am on the "Quiz 1" "mod_quiz > Edit" page logged in as "teacher1"
+    When I open the "last" add to quiz menu
+    And I follow "from question bank"
+    And I set the field with xpath "//input[@type='checkbox' and @id='qbheadercheckbox']" to "1"
+    And I press "Add selected questions to the quiz"
+    Then I should see "question 01 name" on quiz page "1"
+    And I should see "question 02 name" on quiz page "2"
+
+  @javascript
+  Scenario: Validate the sorting while adding questions from question bank
+    Given the following "questions" exist:
+      | questioncategory | qtype       | name              | questiontext          |
+      | Test questions   | multichoice | question 03 name  | question 03 name text |
+    And I am on the "Quiz 1" "mod_quiz > Edit" page logged in as "teacher1"
+    When I open the "last" add to quiz menu
+    And I follow "from question bank"
+    And I click on "Sort by Question ascending" "link"
+    Then "question 01 name" "text" should appear before "question 02 name" "text"
+    And I click on "Sort by Question descending" "link"
+    And "question 03 name" "text" should appear before "question 01 name" "text"
+    And I follow "Sort by Question type ascending"
+    Then "question 01 name" "text" should appear before "question 03 name" "text"
+    And I follow "Sort by Question type descending"
+    Then "question 03 name" "text" should appear before "question 01 name" "text"
+
+  Scenario: Shuffle option could be set before adding any question to the quiz
+    Given the following "questions" exist:
+      | questioncategory | qtype | name             | questiontext     |
+      | Test questions   | essay | question 03 name | question 03 text |
+    And I log in as "teacher1"
+    And I am on the "Quiz 1" "mod_quiz > Edit" page
+    When I set the field "Shuffle" to "1"
+    And I open the "last" add to quiz menu
+    And I follow "from question bank"
+    Then I should see "question 01 name"

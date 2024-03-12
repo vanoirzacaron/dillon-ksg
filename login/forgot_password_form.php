@@ -26,6 +26,7 @@ defined('MOODLE_INTERNAL') || die();
 
 require_once($CFG->libdir.'/formslib.php');
 require_once($CFG->dirroot.'/user/lib.php');
+require_once('lib.php');
 
 /**
  * Reset forgotten password form definition.
@@ -45,7 +46,10 @@ class login_forgot_password_form extends moodleform {
 
         $mform    = $this->_form;
         $mform->setDisableShortforms(true);
-/*  Edited by Dave Emsley 11/1/2023
+
+        // Hook for plugins to extend form definition.
+        core_login_extend_forgot_password_form($mform);
+
         $mform->addElement('header', 'searchbyusername', get_string('searchbyusername'), '');
 
         $purpose = user_edit_map_field_purpose($USER->id, 'username');
@@ -54,7 +58,7 @@ class login_forgot_password_form extends moodleform {
 
         $submitlabel = get_string('search');
         $mform->addElement('submit', 'submitbuttonusername', $submitlabel);
-*/
+
         $mform->addElement('header', 'searchbyemail', get_string('searchbyemail'), '');
 
         $purpose = user_edit_map_field_purpose($USER->id, 'email');
@@ -74,6 +78,10 @@ class login_forgot_password_form extends moodleform {
     function validation($data, $files) {
 
         $errors = parent::validation($data, $files);
+
+        // Extend validation for any form extensions from plugins.
+        $errors = array_merge($errors, core_login_validate_extend_forgot_password_form($data));
+
         $errors += core_login_validate_forgot_password_data($data);
 
         return $errors;

@@ -98,18 +98,10 @@ class provider implements
             return;
         }
 
-        $params = [
-            'contextid' => $context->id,
-            'contextuser' => CONTEXT_USER,
-        ];
-
-        $sql = "SELECT brc.userid as userid
-                  FROM {block_rss_client} brc
-                  JOIN {context} ctx
-                       ON ctx.instanceid = brc.userid
-                       AND ctx.contextlevel = :contextuser
-                 WHERE ctx.id = :contextid";
-
+        $sql = "SELECT userid
+                  FROM {block_rss_client}
+                 WHERE userid = ?";
+        $params = [$context->instanceid];
         $userlist->add_from_sql('userid', $sql, $params);
     }
 
@@ -142,7 +134,7 @@ class provider implements
     /**
      * Delete all use data which matches the specified deletion_criteria.
      *
-     * @param   context $context A user context.
+     * @param   \context $context A user context.
      */
     public static function delete_data_for_all_users_in_context(\context $context) {
         if ($context instanceof \context_user) {

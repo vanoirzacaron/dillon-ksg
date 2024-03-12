@@ -18,6 +18,7 @@
  * Version details
  *
  * @package   theme_adaptable
+ * @copyright 2023 G J Barnard (http://moodle.org/user/profile.php?id=442195)
  * @copyright 2015-2019 Jeremy Hopkins (Coventry University)
  * @copyright 2015-2019 Fernando Acedo (3-bits.com)
  * @copyright 2017-2019 Manoj Solanki (Coventry University)
@@ -27,15 +28,14 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-// Set HTTPS if needed.
-if (empty($CFG->loginhttps)) {
-    $wwwroot = $CFG->wwwroot;
-} else {
-    $wwwroot = str_replace("http://", "https://", $CFG->wwwroot);
-}
+$bodyclasses = array();
+$bodyclasses[] = 'theme_adaptable';
+$bodyclasses[] = 'two-column';
 
-// Check if this is a course or module page and check setting to hide site title.
-// If not one of these pages, by default show it (set $hidesitetitle to false).
+$pageclasses = array();
+
+/* Check if this is a course or module page and check setting to hide site title.
+   If not one of these pages, by default show it (set $hidesitetitle to false). */
 if ( (strstr($PAGE->pagetype, 'course')) ||
      (strstr($PAGE->pagetype, 'mod')) && ($this->page->course->id > 1) ) {
     $hidesitetitle = !empty(($PAGE->theme->settings->coursepageheaderhidesitetitle)) ? true : false;
@@ -45,17 +45,15 @@ if ( (strstr($PAGE->pagetype, 'course')) ||
 
 // Screen size.
 theme_adaptable_initialise_zoom();
-$setzoom = theme_adaptable_get_zoom();
+$bodyclasses[] = theme_adaptable_get_zoom();
 
 theme_adaptable_initialise_full();
-$setfull = theme_adaptable_get_full();
+$bodyclasses[] = theme_adaptable_get_full();
 
 $bsoptionsdata = array('data' => array());
 
 // Main navbar.
-if (isset($PAGE->theme->settings->stickynavbar) && $PAGE->theme->settings->stickynavbar == 1
-    && $PAGE->pagetype != "grade-report-grader-index" && $PAGE->bodyid != "page-grade-report-grader-index") {
-    $fixedheader = true;
+if (isset($PAGE->theme->settings->stickynavbar) && $PAGE->theme->settings->stickynavbar == 1) {
     $bsoptionsdata['data']['stickynavbar'] = true;
 } else {
     $bsoptionsdata['data']['stickynavbar'] = false;
@@ -64,20 +62,13 @@ if (isset($PAGE->theme->settings->stickynavbar) && $PAGE->theme->settings->stick
 // JS calls.
 $PAGE->requires->js_call_amd('theme_adaptable/adaptable', 'init');
 $PAGE->requires->js_call_amd('theme_adaptable/bsoptions', 'init', $bsoptionsdata);
-$PAGE->requires->js_call_amd('theme_adaptable/drawer', 'init');
 
 // Layout.
 $left = (!right_to_left());  // To know if to add 'pull-right' and 'desktop-first-column' classes in the layout for LTR.
 
-$hasmiddle = $PAGE->blocks->region_has_content('middle', $OUTPUT);
-$hasfootnote = (!empty($PAGE->theme->settings->footnote));
-
-$responsivealerts = $PAGE->theme->settings->responsivealerts;
-
 // Navbar Menu.
 $shownavbar = false;
-if (
-    (isloggedin() && !isguestuser()) ||
+if ((isloggedin() && !isguestuser()) ||
     (!empty($PAGE->theme->settings->enablenavbarwhenloggedout)) ) {
 
     // Show navbar unless disabled by config.
@@ -93,7 +84,7 @@ if (!empty($PAGE->theme->settings->categoryhavecustomheader)) {
         $categoryheaderbgimageset = 'categoryheaderbgimage'.$currenttopcat;
         if (!empty($PAGE->theme->settings->$categoryheaderbgimageset)) {
             $headerbg = ' class="headerbgimage" style="background-image: ' .
-            ' url('.$PAGE->theme->setting_file_url($categoryheaderbgimageset, $categoryheaderbgimageset).');"';
+            'url(\''.$PAGE->theme->setting_file_url($categoryheaderbgimageset, $categoryheaderbgimageset).'\');"';
         }
     }
 } else {
@@ -101,69 +92,34 @@ if (!empty($PAGE->theme->settings->categoryhavecustomheader)) {
 }
 if ((empty($headerbg)) && (!empty($PAGE->theme->settings->headerbgimage))) {
     $headerbg = ' class="headerbgimage" style="background-image: ' .
-    ' url('.$PAGE->theme->setting_file_url('headerbgimage', 'headerbgimage').');"';
+    'url(\''.$PAGE->theme->setting_file_url('headerbgimage', 'headerbgimage').'\');"';
+}
+if (!empty($headerbg)) {
+    $bodyclasses[] = 'has-header-bg';
 }
 
-// Choose the header style.  There styles available are:
-// "style1"  (original header)
-// "style2"  (2 row header).
-
-$adaptableheaderstyle = "style1";
+/* Choose the header style.  There styles available are:
+   "style1"  (original header)
+   "style2"  (2 row header).
+*/
 
 if (!empty($PAGE->theme->settings->headerstyle)) {
     $adaptableheaderstyle = $PAGE->theme->settings->headerstyle;
+} else {
+    $adaptableheaderstyle = "style1";
 }
-
-// User image, name in user menu dropdown.
-$userpic = '';
-$username = '';
-$usermenu = '';
-// Only used when user is logged in.
-if (isloggedin()) {
-    // User icon.
-    $userpic = $OUTPUT->user_picture($USER, array('link' => false, 'visibletoscreenreaders' => false,
-               'size' => 50, 'class' => 'userpicture'));
-    // User name.
-    $username = format_string(fullname($USER));
-
-    // User menu dropdown.
-    if (!empty($PAGE->theme->settings->usernameposition)) {
-        $usernameposition = $PAGE->theme->settings->usernameposition;
-        if ($usernameposition == 'right') {
-            $usernamepositionleft = false;
-        } else {
-            $usernamepositionleft = true;
-        }
-    } else {
-        $usernamepositionleft = true;
-    }
-
-    // Set template data.
-    $data = [
-        'username' => $username,
-        'userpic' => $userpic,
-        'showusername' => $PAGE->theme->settings->showusername,
-        'usernamepositionleft' => $usernamepositionleft,
-        'userprofilemenu' => $OUTPUT->user_profile_menu(),
-    ];
-    $usermenu = $OUTPUT->render_from_template('theme_adaptable/usermenu', $data);
-}
-
-// Get the HTML for the settings bits.
-$html = theme_adaptable_get_html_for_settings($OUTPUT, $PAGE);
+$bodyclasses[] = 'header-'.$adaptableheaderstyle;
 
 // Social icons class.
-$showicons = "";
 $showicons = $PAGE->theme->settings->blockicons;
 if ($showicons == 1) {
-    $showiconsclass = "showblockicons";
-} else {
-    $showiconsclass = " ";
+    $bodyclasses[] = 'showblockicons';
 }
 
-$standardscreenwidthclass = 'standard';
 if (!empty($PAGE->theme->settings->standardscreenwidth)) {
-    $standardscreenwidthclass = $PAGE->theme->settings->standardscreenwidth;
+    $bodyclasses[] = $PAGE->theme->settings->standardscreenwidth;
+} else {
+    $bodyclasses[] = 'standard';
 }
 
 // HTML header.
@@ -178,542 +134,278 @@ echo $OUTPUT->doctype();
 // Include header.
 require_once(dirname(__FILE__) . '/head.php');
 
-// If it is a mobile and the header is not hidden or it is a desktop there will be a page header.
-$pageheader = 'has-page-header';
+$left = $PAGE->theme->settings->blockside;
 
-$hasheaderbg = '';
-if (!empty($headerbg)) {
-    $hasheaderbg = 'has-header-bg';
+$courseindexheader = false;
+switch ($PAGE->pagelayout) {
+    case 'base':
+    case 'standard':
+    case 'course':
+    case 'coursecategory':
+    case 'incourse':
+    case 'frontpage':
+    case 'admin':
+    case 'mycourses':
+    case 'mydashboard':
+    case 'mypublic':
+    case 'report':
+        require_once(dirname(__FILE__) . '/courseindexheader.php');
+        $courseindexheader = true;
+    break;
+    default:
+        $courseindex = false;
+}
+
+if ($sidepostdrawer) {
+    require_once(dirname(__FILE__) . '/sidepostheader.php');
+} else {
+    $hassidepost = false;
+}
+
+if ($courseindexheader) {
+    if ($courseindexopen) {
+        $bodyclasses[] = 'drawer-open-index';
+    }
+}
+
+if (($courseindex) || ($hassidepost)) {
+    $bodyclasses[] = 'uses-drawers';
+    $pageclasses[] = 'drawers';
 }
 
 $nomobilenavigation = '';
 if (!empty($PAGE->theme->settings->responsivesectionnav)) {
     $nomobilenavigation = 'nomobilenavigation';
+    $bodyclasses[] = $nomobilenavigation;
 }
+
 ?>
-<body <?php echo $OUTPUT->body_attributes(array('theme_adaptable', 'two-column', $setzoom, 'header-'.$adaptableheaderstyle,
-        $pageheader, $hasheaderbg, $nomobilenavigation)); ?>>
+<body <?php echo $OUTPUT->body_attributes($bodyclasses); ?>>
 
 <?php
 echo $OUTPUT->standard_top_of_body_html();
-
-// Development or wrong moodle version alert.
-// echo $OUTPUT->get_dev_alert();.
 ?>
 
-<div id="page" class="<?php echo "$setfull $showiconsclass $standardscreenwidthclass"; ?>">
+<div id="page-wrapper">
+    <?php
+    if (!empty($courseindexmarkup)) {
+        echo $courseindexmarkup;
+    }
+    if (!empty($sidepostmarkup)) {
+        echo $sidepostmarkup;
+    }
+    if (!$bsoptionsdata['data']['stickynavbar']) {
+        echo '<div id="page" class="'.implode(' ', $pageclasses).'">';
+    }
 
-<?php
-    echo $OUTPUT->get_alert_messages();
-?>
+    $headercontext = [
+        'output' => $OUTPUT
+    ];
 
+    if (!empty($nomobilenavigation)) {
+        $primary = new theme_adaptable\output\navigation\primary($PAGE);
+        $renderer = $PAGE->get_renderer('core');
+        $primarymenu = $primary->export_for_template($renderer);
+        $headercontext['mobileprimarynav'] = $primarymenu['mobileprimarynav'];
+        $headercontext['mobileprimarynavicon'] = \theme_adaptable\toolbox::getfontawesomemarkup('bars');
+        $headercontext['hasmobileprimarynav'] = true;
+    }
 
-<?php if ($adaptableheaderstyle == "style1") : ?>
-
-    <header id="adaptable-page-header-wrapper" <?php echo $headerbg; ?> >
-
-    <div id="above-header" class="mb-2 mb-lg-3">
-        <div class="container">
-            <nav class="navbar navbar-expand btco-hover-menu">
-
-                <?php if ($shownavbar) { ?>
-                <div id="adaptable-page-header-nav-drawer" data-region="drawer-toggle" class="d-lg-none mr-3">
-                    <button id="drawer" aria-expanded="false" aria-controls="nav-drawer" type="button"
-                            class="nav-link float-sm-left mr-1" data-side="left">
-                        <i class="fa fa-bars fa-fw " aria-hidden="true"></i>
-                        <span class="sr-only"><?php echo get_string('sidepanel'); ?></span>
-                    </button>
-                </div>
-                <?php } ?>
-
-                <div class="collapse navbar-collapse">
-                <?php
-                if (empty($PAGE->theme->settings->menuslinkright)) {
-                    echo '<div class="my-auto m-1">' . $OUTPUT->get_top_menus() . '</div>';
+    if ((!isloggedin() || isguestuser()) && ($PAGE->pagetype != "login-index")) {
+        if ($PAGE->theme->settings->displaylogin != 'no') {
+            $loginformcontext = [
+                'displayloginbox' => ($PAGE->theme->settings->displaylogin == 'box') ? true : false,
+                'output' => $OUTPUT,
+                'token' => s(\core\session\manager::get_login_token()),
+                'url' => new moodle_url('/login/index.php')
+            ];
+            if (!$loginformcontext['displayloginbox']) {
+                $authsequence = get_enabled_auth_plugins(); // Get all auths.
+                if (in_array('oidc', $authsequence)) {
+                    $authplugin = get_auth_plugin('oidc');
+                    $oidc = $authplugin->loginpage_idp_list($this->page->url->out(false));
+                    if (!empty($oidc)) {
+                        $loginformcontext['hasoidc'] = true;
+                        $loginformcontext['oidcdata'] = \auth_plugin_base::prepare_identity_providers_for_output($oidc, $OUTPUT);
+                    }
                 }
-                ?>
-
-                    <ul class="navbar-nav ml-auto my-auto">
-
-                        <div class="pull-left">
-                            <?php echo $OUTPUT->user_menu(); ?>
-                        </div>
-
-                        <?php
-                        if (!empty($PAGE->theme->settings->menuslinkright)) {
-                            echo '<div class="my-auto m-1">' . $OUTPUT->get_top_menus() . '</div>';
-                        }
-                        ?>
-
-                        <?php
-                        if (!empty($PAGE->theme->settings->responsivesearchicon)) {
-                            $classes = 'd-xs-block d-sm-block d-md-none my-auto';
-                        } else {
-                            $classes = 'd-none';
-                        }
-                        ?>
-                        <li class="nav-item <?php echo $classes; ?> mx-md-1 my-auto">
-                            <a class="nav-link" href="<?php p($wwwroot) ?>/course/search.php">
-                                <i class="icon fa fa-search fa-fw " title="Search" aria-label="Search"></i>
-                            </a>
-                        </li>
-
-                        <?php
-
-                        // Remove Messages and Notifications icons when no navbar.
-                        if (empty($PAGE->layout_options['nonavbar'])) {
-                            echo '<div class="my-auto mx-md-1">' . $OUTPUT->navbar_plugin_output() . '</div>';
-                        }
-
-                        if (empty($PAGE->layout_options['langmenu']) || $PAGE->layout_options['langmenu']) {
-                            echo '<li class="nav-item dropdown ml-2 my-auto">';
-                            echo $OUTPUT->lang_menu();
-                            echo '</li>';
-                        }
-
-                        if ((!isloggedin() || isguestuser()) && ($PAGE->pagetype != "login-index")) {
-                            echo $OUTPUT->page_heading_menu();
-
-                            if ($PAGE->theme->settings->displaylogin == 'box') {
-                                // Login button.
-                        ?>
-                        <form id="pre-login-form" class="form-inline my-2 my-lg-0" action="<?php p($wwwroot) ?>/login/index.php"
-                            method="post">
-                        <input type="hidden" name="logintoken" value="<?php echo s(\core\session\manager::get_login_token()); ?>"/>
-                        <input type="text" name="username"
-                                    placeholder="<?php echo get_string('loginplaceholder', 'theme_adaptable'); ?>" size="11">
-                        <input type="password" name="password"
-                                    placeholder="<?php echo get_string('passwordplaceholder', 'theme_adaptable'); ?>"  size="11">
-                        <button class="btn-login" type="submit"><?php echo get_string('logintextbutton', 'theme_adaptable'); ?>
-                        </button>
-                        </form>
-                        <?php
-                            } else if ($PAGE->theme->settings->displaylogin == 'button') {
-                        ?>
-                            <form id="pre-login-form" class="form-inline my-0 my-lg-1"
-                                action="<?php p($wwwroot) ?>/login/index.php" method="post">
-                            <input type="hidden" name="logintoken"
-                                value="<?php echo s(\core\session\manager::get_login_token()); ?>"/>
-                            <button class="btn-login" type="submit">
-                                <?php echo get_string('logintextbutton', 'theme_adaptable'); ?>
-                            </button>
-                            </form>
-                        <?php
-                            }
-                        } else {
-                            // Display user profile menu.
-                            ?>
-
-                            <li class="nav-item dropdown ml-3 ml-md-4 mr-2 mr-md-0">
-                                <?php echo $usermenu; ?>
-                            </li>
-
-                        <?php
-                        }
-                    ?>
-
-                    </ul>
-                </div>
-            </nav>
-        </div>
-    </div>
-
-    <div id="page-header" class="container <?php echo $PAGE->theme->settings->responsiveheader;?>">
-        <div class="row">
-
-        <div class="col-lg-4">
-        <?php
-        // Site title or logo.
-        if (!$hidesitetitle) {
-            echo '<div class="d-flex align-items-start bd-highlight">';
-            echo $OUTPUT->get_logo_title($currenttopcat);
-            echo '</div>';
+            }
+            $headercontext['loginoruser'] = '<li class="nav-item">'.
+                $OUTPUT->render_from_template('theme_adaptable/headerloginform', $loginformcontext).'</li>';
+        } else {
+            $headercontext['loginoruser'] = '';
         }
-        ?>
-        </div>
+    } else {
+        // Display user profile menu.
+        // Only used when user is logged in and not on the secure layout.
+        if ((isloggedin()) && ($PAGE->pagelayout != 'secure')) {
+            // User icon.
+            $userpic = $OUTPUT->user_picture($USER, array('link' => false, 'visibletoscreenreaders' => false,
+                'size' => 35, 'class' => 'userpicture'));
+            // User name.
+            $username = format_string(fullname($USER));
 
-        <div class="col-lg-8 p-0 my-auto">
-            <?php
-            // Remove Search Box or Social icons when no navbar.
-            if (empty($PAGE->layout_options['nonavbar'])) {
-                // Social icons.
-                if ($PAGE->theme->settings->socialorsearch == 'social') {
-                        ?>
-                        <div class="socialbox pull-right <?php echo $PAGE->theme->settings->responsivesocial; ?>">
-                            <?php
-                            echo $OUTPUT->socialicons();
-                            ?>
-                        </div>
-                        <?php
+            // User menu dropdown.
+            if (!empty($PAGE->theme->settings->usernameposition)) {
+                $usernameposition = $PAGE->theme->settings->usernameposition;
+                if ($usernameposition == 'right') {
+                    $usernamepositionleft = false;
+                } else {
+                    $usernamepositionleft = true;
                 }
+            } else {
+                $usernamepositionleft = true;
             }
-                    ?>
 
-                <?php
-                // Search box.
-                if ( (!$hidesitetitle) && ($PAGE->theme->settings->socialorsearch == 'search') ) { ?>
-                    <div class="searchbox d-none d-lg-block">
-                        <form action="<?php echo $wwwroot; ?>/course/search.php">
-                            <label class="hidden" for="search-1" style="display: none;"><?php echo get_string("searchcourses")?>
-                            </label>
-                            <div class="search-box grey-box bg-white clear-fix">
-                                <input placeholder="<?php echo get_string("searchcourses", "theme_adaptable"); ?>"
-                                        accesskey="6"
-                                        class="search_tour bg-white no-border left search-box__input ui-autocomplete-input"
-                                        type="text"
-                                        name="search"
-                                        id="search-1"
-                                        autocomplete="off">
-                                        <button title="<?php echo get_string("searchcourses", "theme_adaptable")?>"
-                                                type="submit" class="no-border bg-white pas search-box__button">
-                                                <abbr class="fa fa-search"
-                                                    title="<?php echo get_string("searchcourses", "theme_adaptable");?>">
-                                                </abbr>
-                                        </button>
-                            </div>
-                        </form>
-                    </div>
-                <?php
-                }
-                ?>
+            // Set template context.
+            $usermenucontext = [
+                'username' => $username,
+                'userpic' => $userpic,
+                'showusername' => $PAGE->theme->settings->showusername,
+                'usernamepositionleft' => $usernamepositionleft,
+                'userprofilemenu' => $OUTPUT->user_profile_menu(),
+            ];
+            $usermenu = $OUTPUT->render_from_template('theme_adaptable/usermenu', $usermenucontext);
+            $headercontext['loginoruser'] = '<li class="nav-item dropdown ml-3 ml-md-2 mr-2 mr-md-0">'.$usermenu.'</li>';
+        } else {
+            $headercontext['loginoruser'] = '';
+        }
+    }
 
-                <div id="course-header">
-                    <?php echo $OUTPUT->course_header(); ?>
-                </div>
+    if (!$hidesitetitle) {
+        $headercontext['sitelogo'] = $OUTPUT->get_logo($currenttopcat, $shownavbar);
+        $headercontext['sitetitle'] = $OUTPUT->get_title($currenttopcat);
+    }
 
-            </div>
-            </div>
+    $headercontext['headerbg'] = $headerbg;
+    $headercontext['shownavbar'] = $shownavbar;
 
-    </div>
+    // Navbar Menu.
+    if ($shownavbar) {
+        $headercontext['shownavbar'] = [
+            'disablecustommenu' => (!empty($PAGE->theme->settings->disablecustommenu)),
+            'navigationmenu' => $OUTPUT->navigation_menu('main-navigation'),
+            'navigationmenudrawer' => $OUTPUT->navigation_menu('main-navigation-drawer'),
+            'output' => $OUTPUT,
+            'toolsmenu' => ($PAGE->theme->settings->enabletoolsmenus)
+        ];
 
-<?php endif; // End header style 1. ?>
+        $navbareditsettings = $PAGE->theme->settings->editsettingsbutton;
+        $headercontext['shownavbar']['showcog'] = true;
+        $showeditbuttons = false;
 
-<?php // Begin header style 2 (2 row header).  This includes a css class ID called "header2". ?>
-<?php if ($adaptableheaderstyle == "style2") : ?>
+        if ($navbareditsettings == 'button') {
+            $showeditbuttons = true;
+            $headercontext['shownavbar']['showcog'] = false;
+        } else if ($navbareditsettings == 'cogandbutton') {
+            $showeditbuttons = true;
+        }
 
-    <header id="adaptable-page-header-wrapper" <?php echo $headerbg; ?> >
+        if ($headercontext['shownavbar']['showcog']) {
+            $headercontext['shownavbar']['coursemenucontent'] = $OUTPUT->context_header_settings_menu();
+            $headercontext['shownavbar']['othermenucontent'] = $OUTPUT->region_main_settings_menu();
+        }
 
-    <div id="header2" class="container">
+        /* Ensure to only hide the button on relevant pages.  Some pages will need the button, such as the
+           dashboard page. Checking if the cog is being displayed above to figure out if it still needs to
+           show (when there is no cog). Also show mod pages (e.g. Forum, Lesson) as these sometimes have
+           a button for a specific purpose. */
+        if (($showeditbuttons) ||
+            (($headercontext['shownavbar']['showcog']) &&
+            ((empty($headercontext['shownavbar']['coursemenucontent'])) &&
+            (empty($headercontext['shownavbar']['othermenucontent'])))) ||
+            (strstr($PAGE->pagetype, 'mod-'))) {
+            $headercontext['shownavbar']['pageheadingbutton'] = $OUTPUT->page_heading_button();
+        }
 
-      <div class="row">
-
-        <div class="d-none d-lg-block col-lg-4">
-        <div class="d-flex align-items-start bd-highlight">
-
-            <?php
-            // Site title or logo.
-            if (!$hidesitetitle) {
-                echo $OUTPUT->get_logo_title($currenttopcat);
+        if (isloggedin()) {
+            if ($PAGE->theme->settings->enablezoom) {
+                $headercontext['shownavbar']['enablezoom'] = true;
+                $headercontext['shownavbar']['enablezoomshowtext'] = ($PAGE->theme->settings->enablezoomshowtext);
             }
-            ?>
+        }
+    }
+    $headercontext['topmenus'] = $OUTPUT->get_top_menus(false);
 
-            <div id="course-header">
-                <?php echo $OUTPUT->course_header(); ?>
-            </div>
-        </div>
-        </div>
+    if ($adaptableheaderstyle == "style1") {
+        $headercontext['menuslinkright'] = (!empty($PAGE->theme->settings->menuslinkright));
+        $headercontext['langmenu'] = (empty($PAGE->layout_options['langmenu']) || $PAGE->layout_options['langmenu']);
+        $headercontext['responsiveheader'] = $PAGE->theme->settings->responsiveheader;
 
-        <div class="col-lg-8 p-0 my-auto">
+        if (!empty($PAGE->theme->settings->pageheaderlayout)) {
+            $headercontext['pageheaderoriginal'] = ($PAGE->theme->settings->pageheaderlayout == 'original');
+        } else {
+            $headercontext['pageheaderoriginal'] = true;
+        }
 
-            <nav class="navbar navbar-expand btco-hover-menu">
+        $headersearchandsocial = (!empty($PAGE->theme->settings->headersearchandsocial)) ? $PAGE->theme->settings->headersearchandsocial : 'none';
 
-                <?php if ($shownavbar) { ?>
-                <div id="adaptable-page-header-nav-drawer" data-region="drawer-toggle" class="d-lg-none mr-3">
-                    <button id="drawer" aria-expanded="false" aria-controls="nav-drawer" type="button"
-                    class="nav-link float-sm-left mr-1" data-side="left">
-                        <i class="fa fa-bars fa-fw " aria-hidden="true"></i>
-                        <span class="sr-only"><?php echo get_string('sidepanel'); ?></span>
-                    </button>
-                </div>
-                <?php } ?>
+        // Search box and social icons.
+        switch ($headersearchandsocial) {
+            case 'socialheader':
+                $headersocialcontext = [
+                    'classes' => $PAGE->theme->settings->responsivesocial,
+                    'pageheaderoriginal' => $headercontext['pageheaderoriginal'],
+                    'output' => $OUTPUT
+                ];
+                $headercontext['searchandsocialheader'] = $OUTPUT->render_from_template('theme_adaptable/headersocial', $headersocialcontext);
+            break;
+            case 'searchmobilenav':
+                $headercontext['searchandsocialnavbar'] = $OUTPUT->search_box();
+                $headercontext['searchandsocialnavbarextra'] = ' d-md-block d-lg-none my-auto';
+                $headersearchcontext = [
+                    'pagelayout' => ($headercontext['pageheaderoriginal']) ? 'pagelayoutoriginal' : 'pagelayoutalternative',
+                    'search' => $OUTPUT->search_box()
+                ];
+                $headercontext['searchandsocialheader'] = $OUTPUT->render_from_template('theme_adaptable/headersearch', $headersearchcontext);
+            break;
+            case 'searchheader':
+                $headersearchcontext = [
+                    'pagelayout' => ($headercontext['pageheaderoriginal']) ? 'pagelayoutoriginal' : 'pagelayoutalternative',
+                    'search' => $OUTPUT->search_box()
+                ];
+                $headercontext['searchandsocialheader'] = $OUTPUT->render_from_template('theme_adaptable/headersearch', $headersearchcontext);
+            break;
+            case 'searchnavbar':
+                $headercontext['searchandsocialnavbar'] = $OUTPUT->search_box();
+            break;
+            case 'searchnavbarsocialheader':
+                $headercontext['searchandsocialnavbar'] = $OUTPUT->search_box();
+                $headersocialcontext = [
+                    'classes' => $PAGE->theme->settings->responsivesocial,
+                    'pageheaderoriginal' => $headercontext['pageheaderoriginal'],
+                    'output' => $OUTPUT
+                ];
+                $headercontext['searchandsocialheader'] = $OUTPUT->render_from_template('theme_adaptable/headersocial', $headersocialcontext);
+            break;
+        }
 
-                <div class="collapse navbar-collapse">
+        echo $OUTPUT->render_from_template('theme_adaptable/headerstyleone', $headercontext);
+    } else if ($adaptableheaderstyle == "style2") {
+        $headercontext['responsiveheader'] = $PAGE->theme->settings->responsiveheader;
+        if (!empty($PAGE->theme->settings->pageheaderlayouttwo)) {
+            $headercontext['pageheaderoriginal'] = ($PAGE->theme->settings->pageheaderlayouttwo == 'original');
+        } else {
+            $headercontext['pageheaderoriginal'] = true;
+        }
 
-                    <ul class="navbar-nav ml-auto">
+        if ($headercontext['pageheaderoriginal']) {
+            $headercontext['navbarsearch'] = $OUTPUT->search_box();
+        }
 
-                        <div class="my-auto">
-                            <?php echo $OUTPUT->search_box(); ?>
-                        </div>
+        if (empty($PAGE->layout_options['langmenu']) || $PAGE->layout_options['langmenu']) {
+            $headercontext['langmenu'] = $OUTPUT->lang_menu(false);
+        }
 
-                        <?php
-                            echo '<div class="my-auto m-1">' . $OUTPUT->get_top_menus($showtext = false) . '</div>';
-                        ?>
-
-                        <div class="pull-left mr-2 my-auto">
-                            <?php echo $OUTPUT->user_menu(); ?>
-                        </div>
-
-                        <?php
-                        if (!empty($PAGE->theme->settings->responsivesearchicon)) {
-                            $classes = 'd-xs-block d-sm-block d-md-none';
-                        } else {
-                            $classes = 'd-none';
-                        }
-                        ?>
-
-                        <?php
-
-                        echo '<div class="my-auto mx-1">' . $OUTPUT->navbar_plugin_output() . '</div>';
-
-                        $showlangtext = false;
-
-                        if (empty($PAGE->layout_options['langmenu']) || $PAGE->layout_options['langmenu']) {
-                            echo '<div class="my-auto">' . $OUTPUT->lang_menu($showlangtext) . '</div>';
-                        }
-
-                        if (!isloggedin() || isguestuser()) {
-                            echo $OUTPUT->page_heading_menu();
-
-                            if ($PAGE->theme->settings->displaylogin == 'box') {
-                                // Login button.
-                        ?>
-                        <form id="pre-login-form" class="form-inline my-auto m-1"
-                            action="<?php p($wwwroot) ?>/login/index.php" method="post">
-                        <input type="hidden" name="logintoken" value="<?php echo s(\core\session\manager::get_login_token()); ?>"/>
-                        <input type="text" name="username"
-                                    placeholder="<?php echo get_string('loginplaceholder', 'theme_adaptable'); ?>" size="11">
-                        <input type="password" name="password"
-                                    placeholder="<?php echo get_string('passwordplaceholder', 'theme_adaptable'); ?>"  size="11">
-                        <button class="btn-login" type="submit"><?php echo get_string('logintextbutton', 'theme_adaptable'); ?>
-                        </button>
-                        </form>
-                        <?php
-                            } else if ($PAGE->theme->settings->displaylogin == 'button') {
-                        ?>
-                            <form id="pre-login-form" class="form-inline my-auto m-1"
-                                action="<?php p($wwwroot) ?>/login/index.php" method="post">
-                            <input type="hidden" name="logintoken"
-                                value="<?php echo s(\core\session\manager::get_login_token()); ?>"/>
-                            <button class="btn-login" type="submit">
-                                <?php echo get_string('logintextbutton', 'theme_adaptable'); ?>
-                            </button>
-                            </form>
-                        <?php
-                            }
-                        } else {
-                            // Display user profile menu.
-                            ?>
-
-                            <li class="nav-item dropdown ml-3 ml-md-2 mr-2 mr-md-0 my-auto">
-                                <?php echo $usermenu; ?>
-                            </li>
-
-                        <?php
-                        }
-                    ?>
-
-                    </ul>
-                </div>
-            </nav>
-        </div>
-      </div>
-    </div>
-
-<?php endif; // End header style 2. ?>
-
-
-<?php
-// Navbar Menu.
-if ($shownavbar) {
-?>
-
-<div id="nav-drawer" data-region="drawer" class="d-print-none moodle-has-zindex closed" aria-hidden="true" tabindex="-1">
-    <div id="nav-drawer-inner">
-        <nav class="list-group">
-            <ul class="list-unstyled components">
-
-                <?php
-                echo $OUTPUT->navigation_menu('main-navigation-drawer');
-
-                if (empty($PAGE->theme->settings->disablecustommenu)) {
-                    echo $OUTPUT->custom_menu_drawer();
-                }
-                if ($PAGE->theme->settings->enabletoolsmenus) {
-                    echo $OUTPUT->tools_menu('tools-menu-drawer');
-                }
-                ?>
-
-            </ul>
-        </nav>
-
-        <nav class="list-group m-t-1">
-            <?php echo $OUTPUT->context_mobile_settings_menu(); ?>
-            <a class="list-group-item list-group-item-action " href="<?php echo $CFG->wwwroot.'/admin/search.php'; ?>">
-                <div class="m-l-0">
-                    <div class="media">
-                        <span class="media-left">
-                            <i class="icon fa fa-wrench fa-fw" aria-hidden="true"></i>
-                        </span>
-                        <span class="media-body "><?php echo get_string('administrationsite'); ?></span>
-                    </div>
-                </div>
-            </a>
-        </nav>
-    </div>
-</div>
-
-<div id="main-navbar" class="d-none d-lg-block">
-    <div class="container">
-        <div class="navbar navbar-expand-md btco-hover-menu">
-            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
-            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-
-            <span class="navbar-toggler-icon"></span>
-            </button>
-
-            <div class="collapse navbar-collapse" id="navbarSupportedContent">
-
-            <nav role="navigation" aria-label="<?php echo get_string('sitelinkslabel', 'theme_adaptable'); ?>">
-                <ul class="navbar-nav">
-                    <?php echo $OUTPUT->navigation_menu('main-navigation'); ?>
-
-                    <?php
-                    if (empty($PAGE->theme->settings->disablecustommenu)) {
-                        echo $OUTPUT->custom_menu();
-                    }
-                    if ($PAGE->theme->settings->enabletoolsmenus) {
-                        echo $OUTPUT->tools_menu();
-                    }
-                    ?>
-                </ul>
-            </nav>
-
-                <ul class="navbar-nav ml-auto">
-
-                    <?php
-                    $navbareditsettings = $PAGE->theme->settings->editsettingsbutton;
-                    $showcog = true;
-                    $showeditbuttons = false;
-
-                    if ($navbareditsettings == 'button') {
-                        $showeditbuttons = true;
-                        $showcog = false;
-                    } else if ($navbareditsettings == 'cogandbutton') {
-                        $showeditbuttons = true;
-                    }
-
-                    $coursemenucontent = $OUTPUT->context_header_settings_menu();
-                    if ($showcog) {
-                        if ($coursemenucontent) {
-                    ?>
-                            <li class="nav-item mr-2">
-                                <div class="context-header-settings-menu">
-                                    <?php echo $coursemenucontent; ?>
-                                </div>
-                            </li>
-                    <?php
-                        }
-                    }
-
-                    $othermenucontent = $OUTPUT->region_main_settings_menu();
-                    if ($showcog) {
-                        if ($othermenucontent) {
-                    ?>
-                            <li class="nav-item mr-2">
-                                <div id="region-main-settings-menu" class="region-main-settings-menu">
-                                    <?php echo $othermenucontent; ?>
-                                </div>
-                            </li>
-                    <?php
-                        }
-                    }
-                    ?>
-
-                    <?php
-                    // Ensure to only hide the button on relevant pages.  Some pages will need the button, such as the
-                    // dashboard page. Checking if the cog is being displayed above to figure out if it still needs to
-                    // show (when there is no cog). Also show mod pages (e.g. Forum, Lesson) as these sometimes have
-                    // a button for a specific purpose.
-                    if ( ($showeditbuttons) || (
-                        (empty($coursemenucontent)) &&
-                        (empty($othermenucontent))
-                        ) ||
-                        (strstr($PAGE->pagetype, 'mod-'))
-                    ) {
-                        $pageheadingbutton = $OUTPUT->page_heading_button();
-                        if (!empty($pageheadingbutton)) {
-                        ?>
-                        <li class="nav-item mx-0 my-auto">
-                             <div id="edittingbutton">
-                                <?php echo $pageheadingbutton; ?>
-                            </div>
-                        </li>
-                        <?php
-                        }
-                    }
-                    ?>
-
-                    <?php
-                    if (isloggedin()) {
-                        if (!empty($this->page->theme->settings->enableshowhideblocks)) {
-                            $zoomside = ((!empty($this->page->theme->settings->blockside)) &&
-                                        ($this->page->theme->settings->blockside == 1)) ? 'left' : 'right';
-                            $hidetitle = get_string('hideblocks', 'theme_adaptable');
-                            $showtitle = get_string('showblocks', 'theme_adaptable');
-                            if ($setzoom == 'zoomin') { // Blocks not shown.
-                                $zoominicontitle = $showtitle;
-                                if ($zoomside == 'right') {
-                                    $icontype = 'outdent';
-                                } else {
-                                    $icontype = 'indent';
-                                }
-                            } else {
-                                $zoominicontitle = $hidetitle;
-                                if ($zoomside == 'right') {
-                                    $icontype = 'indent';
-                                } else {
-                                    $icontype = 'outdent';
-                                }
-                            }
-                            echo html_writer::start_tag('li', array('class' => 'nav-item mr-1'));
-                            echo html_writer::start_tag('div',
-                                array('id' => 'zoominicon', 'class' => $zoomside. ' nav-link', 'title' => $zoominicontitle,
-                                    'data-hidetitle' => $hidetitle, 'data-showtitle' => $showtitle));
-                            echo html_writer::tag('i', '', array('class' => 'fa fa-lg fa-'.$icontype, 'aria-hidden' => 'true'));
-                            if ($PAGE->theme->settings->enableshowhideblockstext) {
-                                echo html_writer::tag('span', $zoominicontitle, array('class' => 'showhideblocksdesc'));
-                            }
-                            echo html_writer::end_tag('div');
-                            echo html_writer::end_tag('li');
-                            $PAGE->requires->js_call_amd('theme_adaptable/zoomin', 'init');
-                        }
-                        if ($PAGE->theme->settings->enablezoom) { ?>
-                            <li class="nav-item mx-0 hbll">
-                                <a class="nav-link moodlewidth" href="javascript:void(0);"
-                                    title="<?php echo get_string('fullscreen', 'theme_adaptable') ?>">
-                                    <i class="fa fa-expand fa-lg"></i>
-                                    <?php if ($PAGE->theme->settings->enablezoomshowtext) { ?>
-                                    <span class="zoomdesc"><?php echo get_string('fullscreen', 'theme_adaptable') ?></span>
-                                    <?php } ?>
-                                </a>
-                            </li>
-                            <li class="nav-item mx-0 sbll">
-                                <a class="nav-link moodlewidth" href="javascript:void(0);"
-                                    title="<?php echo get_string('standardview', 'theme_adaptable') ?>">
-                                    <i class="fa fa-compress fa-lg"></i>
-                                    <?php if ($PAGE->theme->settings->enablezoomshowtext) { ?>
-                                    <span class="zoomdesc"><?php echo get_string('standardview', 'theme_adaptable') ?></span>
-                                    <?php } ?>
-                                </a>
-                            </li>
-                    <?php
-                        }
-                    }
-                    ?>
-                </ul>
-
-            </div>
-        </div>
-    </div>
-</div>
-
-<?php
-}
-?>
-
-</header>
-
-<?php
-
-// Display News Ticker.
-echo $OUTPUT->get_news_ticker();
+        echo $OUTPUT->render_from_template('theme_adaptable/headerstyletwo', $headercontext);
+    }
+    if ($bsoptionsdata['data']['stickynavbar']) {
+        echo '<div id="page" class="'.implode(' ', $pageclasses).'">';
+    }
+    if (!empty($courseindextogglemarkup)) {
+        echo $courseindextogglemarkup;
+    }
+    if (!empty($sideposttogglemarkup)) {
+        echo $sideposttogglemarkup;
+    }
+    echo $OUTPUT->get_alert_messages();

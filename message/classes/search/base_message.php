@@ -141,7 +141,7 @@ abstract class base_message extends \core_search\base {
      * @return \moodle_recordset|null Recordset or null if no results possible
      * @throws \coding_exception If context invalid
      */
-    protected function get_document_recordset_helper($modifiedfrom, \context $context = null,
+    protected function get_document_recordset_helper($modifiedfrom, ?\context $context,
             $userfield) {
         global $DB;
 
@@ -206,5 +206,14 @@ abstract class base_message extends \core_search\base {
      */
     public function get_doc_icon(\core_search\document $doc) : \core_search\document_icon {
         return new \core_search\document_icon('t/message');
+    }
+
+    /**
+     * Returns a list of category names associated with the area.
+     *
+     * @return array
+     */
+    public function get_category_names() {
+        return [\core_search\manager::SEARCH_AREA_CATEGORY_USERS];
     }
 }

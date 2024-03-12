@@ -34,33 +34,19 @@ defined('MOODLE_INTERNAL') || die();
 function xmldb_tool_policy_upgrade($oldversion) {
     global $DB;
 
-    $dbman = $DB->get_manager();
+    // Automatically generated Moodle v3.9.0 release upgrade line.
+    // Put any upgrade step following this.
 
-    if ($oldversion < 2018082900) {
-        // Add field agreementstyle to the table tool_policy_versions.
-        $table = new xmldb_table('tool_policy_versions');
-        $field = new xmldb_field('agreementstyle', XMLDB_TYPE_INTEGER, '3', null, XMLDB_NOTNULL, null, '0', 'policyid');
+    // Automatically generated Moodle v4.0.0 release upgrade line.
+    // Put any upgrade step following this.
 
-        if (!$dbman->field_exists($table, $field)) {
-            $dbman->add_field($table, $field);
-        }
+    // Automatically generated Moodle v4.1.0 release upgrade line.
+    // Put any upgrade step following this.
 
-        upgrade_plugin_savepoint(true, 2018082900, 'tool', 'policy');
-    }
+    // Automatically generated Moodle v4.2.0 release upgrade line.
+    // Put any upgrade step following this.
 
-    if ($oldversion < 2018091800) {
-        // Add field "optional" to the table "tool_policy_versions".
-        $table = new xmldb_table('tool_policy_versions');
-        $field = new xmldb_field('optional', XMLDB_TYPE_INTEGER, '3', null, XMLDB_NOTNULL, null, '0', 'agreementstyle');
-
-        if (!$dbman->field_exists($table, $field)) {
-            $dbman->add_field($table, $field);
-        }
-
-        upgrade_plugin_savepoint(true, 2018091800, 'tool', 'policy');
-    }
-
-    // Automatically generated Moodle v3.6.0 release upgrade line.
+    // Automatically generated Moodle v4.3.0 release upgrade line.
     // Put any upgrade step following this.
 
     return true;

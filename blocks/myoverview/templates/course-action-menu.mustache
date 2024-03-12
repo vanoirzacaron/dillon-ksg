@@ -30,10 +30,8 @@
         data-toggle="dropdown"
         aria-haspopup="true"
         aria-expanded="false">
-        {{#pix}} i/moremenu, core {{/pix}}
-            <span class="sr-only">
-                {{#str}} aria:courseactions, block_myoverview {{/str}} {{{fullname}}}
-            </span>
+        <i class="icon fa fa-ellipsis-v fa-fw m-0" title="{{#str}} aria:courseactions, block_myoverview {{/str}} {{{fullname}}}" aria-hidden="true"></i>
+        <span class="sr-only">{{#str}} aria:courseactions, block_myoverview {{/str}} {{{fullname}}}</span>
     </button>
     <div class="dropdown-menu dropdown-menu-right">
         <a class="dropdown-item {{#isfavourite}}hidden{{/isfavourite}}" href="#"
@@ -41,7 +39,6 @@
             data-course-id="{{id}}"
             aria-controls="favorite-icon-{{ id }}-{{ uniqid }}"
             >
-            <span class="text-primary">{{#pix}} i/star, core, {{#str}} favourites, block_myoverview {{/str}} {{/pix}}</span>
             {{#str}} addtofavourites, block_myoverview {{/str}}
             <div class="sr-only">
                 {{#str}} aria:addtofavourites, block_myoverview {{/str}} {{{fullname}}}
@@ -62,7 +59,6 @@
             data-course-id="{{id}}"
             aria-controls="favorite-icon-{{ id }}-{{ uniqid }}"
             >
-            {{#pix}} i/show, core, {{#str}} hidden, block_myoverview {{/str}} {{/pix}}
             {{#str}} show, block_myoverview {{/str}}
             <div class="sr-only">
                 {{#str}} aria:showcourse, block_myoverview, {{fullname}} {{/str}}
@@ -73,7 +69,6 @@
             data-course-id="{{id}}"
             aria-controls="favorite-icon-{{ id }}-{{ uniqid }}"
             >
-            {{#pix}} i/hide, core, {{#str}} hidden, block_myoverview {{/str}} {{/pix}}
             {{#str}} hidecourse, block_myoverview {{/str}}
             <div class="sr-only">
                 {{#str}} aria:hidecourse, block_myoverview, {{fullname}} {{/str}}

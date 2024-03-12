@@ -84,13 +84,16 @@ class manager {
         // Get user records for all members of the conversation.
         // We must fetch distinct users, because it's possible for a user to message themselves via bulk user actions.
         // In such cases, there will be 2 records referring to the same user.
-        $sql = "SELECT u.*
+        $sql = "SELECT u.*, mca.id as ismuted
                   FROM {user} u
+             LEFT JOIN {message_conversation_actions} mca
+                    ON mca.userid = u.id AND mca.conversationid = ? AND mca.action = ?
                  WHERE u.id IN (
                           SELECT mcm.userid FROM {message_conversation_members} mcm
-                           WHERE mcm.conversationid = :convid
+                           WHERE mcm.conversationid = ?
                  )";
-        $members = $DB->get_records_sql($sql, ['convid' => $eventdata->convid]);
+        $members = $DB->get_records_sql($sql, [$eventdata->convid, \core_message\api::CONVERSATION_ACTION_MUTED,
+            $eventdata->convid]);
         if (empty($members)) {
             throw new \moodle_exception("Conversation has no members or does not exist.");
         }
@@ -105,6 +108,13 @@ class manager {
 
         // Get conversation type and name. We'll use this to determine which message subject to generate, depending on type.
         $conv = $DB->get_record('message_conversations', ['id' => $eventdata->convid], 'id, type, name');
+
+        // For now Self conversations are not processed because users are aware of the messages sent by themselves, so we
+        // can return early.
+        if ($conv->type == \core_message\api::MESSAGE_CONVERSATION_TYPE_SELF) {
+            return $savemessage->id;
+        }
+        $localisedeventdata->conversationtype = $conv->type;
 
         // We treat individual conversations the same as any direct message with 'userfrom' and 'userto' specified.
         // We know the other user, so set the 'userto' field so that the event code will get access to this field.
@@ -138,7 +148,10 @@ class manager {
         foreach ($otherusers as $recipient) {
             // If this message was a legacy (1:1) message, then we use the userto.
             if ($legacymessage) {
+                $ismuted = $recipient->ismuted;
+
                 $recipient = $eventdata->userto;
+                $recipient->ismuted = $ismuted;
             }
 
             $usertoisrealuser = (\core_user::is_real_user($recipient->id) != false);
@@ -156,6 +169,14 @@ class manager {
 
             // Spoof the userto based on the current member id.
             $localisedeventdata->userto = $recipient;
+            // Check if the notification is including images that will need a user token to be displayed outside Moodle.
+            if (!empty($localisedeventdata->customdata)) {
+                $customdata = json_decode($localisedeventdata->customdata);
+                if (is_object($customdata) && !empty($customdata->notificationiconurl)) {
+                    $customdata->tokenpluginfile = get_user_key('core_files', $localisedeventdata->userto->id);
+                    $localisedeventdata->customdata = $customdata; // Message class will JSON encode again.
+                }
+            }
 
             $s = new \stdClass();
             $s->sitename = format_string($SITE->shortname, true, array('context' => \context_course::instance(SITEID)));
@@ -165,10 +186,18 @@ class manager {
             $localisedeventdata->fullmessage = $eventdata->fullmessage;
             $localisedeventdata->fullmessagehtml = $eventdata->fullmessagehtml;
             if (!empty($localisedeventdata->fullmessage)) {
+                // Prevent unclosed HTML elements.
+                $localisedeventdata->fullmessage =
+                    \core_message\helper::prevent_unclosed_html_tags($localisedeventdata->fullmessage, true);
+
                 $localisedeventdata->fullmessage .= "\n\n---------------------------------------------------------------------\n"
                     . $emailtagline;
             }
             if (!empty($localisedeventdata->fullmessagehtml)) {
+                // Prevent unclosed HTML elements.
+                $localisedeventdata->fullmessagehtml =
+                    \core_message\helper::prevent_unclosed_html_tags($localisedeventdata->fullmessagehtml, true);
+
                 $localisedeventdata->fullmessagehtml .=
                     "<br><br>---------------------------------------------------------------------<br>" . $emailtagline;
             }
@@ -179,24 +208,10 @@ class manager {
                 return false;
             }
 
-            // Set the online state.
-            if (isset($CFG->block_online_users_timetosee)) {
-                $timetoshowusers = $CFG->block_online_users_timetosee * 60;
-            } else {
-                $timetoshowusers = 300;
-            }
-
-            // Work out if the user is logged in or not.
-            $userstate = 'loggedoff';
-            if (!empty($localisedeventdata->userto->lastaccess)
-                    && (time() - $timetoshowusers) < $localisedeventdata->userto->lastaccess) {
-                $userstate = 'loggedin';
-            }
-
             // Fill in the array of processors to be used based on default and user preferences.
-            // This applies only to individual conversations. Messages to group conversations ignore processors.
+            // Do not process muted conversations.
             $processorlist = [];
-            if ($conv->type == \core_message\api::MESSAGE_CONVERSATION_TYPE_INDIVIDUAL) {
+            if (!$recipient->ismuted) {
                 foreach ($processors as $processor) {
                     // Skip adding processors for internal user, if processor doesn't support sending message to internal user.
                     if (!$usertoisrealuser && !$processor->object->can_send_to_any_users()) {
@@ -204,15 +219,22 @@ class manager {
                     }
 
                     // First find out permissions.
-                    $defaultpreference = $processor->name . '_provider_' . $preferencebase . '_permitted';
-                    if (isset($defaultpreferences->{$defaultpreference})) {
-                        $permitted = $defaultpreferences->{$defaultpreference};
+                    $defaultlockedpreference = $processor->name . '_provider_' . $preferencebase . '_locked';
+                    $locked = false;
+                    if (isset($defaultpreferences->{$defaultlockedpreference})) {
+                        $locked = $defaultpreferences->{$defaultlockedpreference};
                     } else {
                         // MDL-25114 They supplied an $eventdata->component $eventdata->name combination which doesn't
                         // exist in the message_provider table (thus there is no default settings for them).
-                        $preferrormsg = "Could not load preference $defaultpreference. Make sure the component and name you supplied
-                    to message_send() are valid.";
-                        throw new coding_exception($preferrormsg);
+                        $preferrormsg = "Could not load preference $defaultlockedpreference.
+                     Make sure the component and name you supplied to message_send() are valid.";
+                        throw new \coding_exception($preferrormsg);
+                    }
+
+                    $enabledpreference = 'message_provider_'.$preferencebase . '_enabled';
+                    $forced = false;
+                    if ($locked && isset($defaultpreferences->{$enabledpreference})) {
+                        $forced = $defaultpreferences->{$enabledpreference};
                     }
 
                     // Find out if user has configured this output.
@@ -220,7 +242,7 @@ class manager {
                     $userisconfigured = $processor->object->is_user_configured($recipient);
 
                     // DEBUG: notify if we are forcing unconfigured output.
-                    if ($permitted == 'forced' && !$userisconfigured) {
+                    if ($forced && !$userisconfigured) {
                         debugging('Attempt to force message delivery to user who has "' . $processor->name .
                             '" output unconfigured', DEBUG_NORMAL);
                     }
@@ -228,13 +250,13 @@ class manager {
                     // Populate the list of processors we will be using.
                     if (!$eventdata->notification && $processor->object->force_process_messages()) {
                         $processorlist[] = $processor->name;
-                    } else if ($permitted == 'forced' && $userisconfigured) {
+                    } else if ($forced && $userisconfigured) {
                         // An admin is forcing users to use this message processor. Use this processor unconditionally.
                         $processorlist[] = $processor->name;
-                    } else if ($permitted == 'permitted' && $userisconfigured && !$recipient->emailstop) {
+                    } else if (!$locked && $userisconfigured && !$recipient->emailstop) {
                         // User has not disabled notifications.
                         // See if user set any notification preferences, otherwise use site default ones.
-                        $userpreferencename = 'message_provider_' . $preferencebase . '_' . $userstate;
+                        $userpreferencename = 'message_provider_' . $preferencebase . '_enabled';
                         if ($userpreference = get_user_preferences($userpreferencename, null, $recipient)) {
                             if (in_array($processor->name, explode(',', $userpreference))) {
                                 $processorlist[] = $processor->name;
@@ -310,15 +332,14 @@ class manager {
             // Trigger event for sending a message or notification - we need to do this before marking as read!
             self::trigger_message_events($eventdata, $savemessage);
 
-            if ($eventdata->notification or empty($CFG->messaging)) {
-                // If they have deselected all processors and its a notification mark it read. The user doesn't want to be bothered.
-                // The same goes if the messaging is completely disabled.
-                if ($eventdata->notification) {
-                    $savemessage->timeread = null;
-                    \core_message\api::mark_notification_as_read($savemessage);
-                } else {
-                    \core_message\api::mark_message_as_read($eventdata->userto->id, $savemessage);
-                }
+            if ($eventdata->notification) {
+                // If they have deselected all processors and it's a notification mark it read. The user doesn't want to be
+                // bothered.
+                $savemessage->timeread = null;
+                \core_message\api::mark_notification_as_read($savemessage);
+            } else if (empty($CFG->messaging)) {
+                // If it's a message and messaging is disabled mark it read.
+                \core_message\api::mark_message_as_read($eventdata->userto->id, $savemessage);
             }
 
             return $savemessage->id;
@@ -334,6 +355,7 @@ class manager {
      * @param \stdClass|\core\message\message $eventdata
      * @param \stdClass $savemessage
      * @param array $processorlist
+     * @throws \moodle_exception
      * @return int $messageid
      */
     protected static function send_message_to_processors($eventdata, \stdClass $savemessage, array
@@ -357,20 +379,16 @@ class manager {
         }
 
         // Send the message to processors.
-        self::call_processors($eventdata, $processorlist);
+        if (!self::call_processors($eventdata, $processorlist)) {
+            throw new \moodle_exception("Message was not sent.");
+        }
 
         // Trigger event for sending a message or notification - we need to do this before marking as read!
         self::trigger_message_events($eventdata, $savemessage);
 
-        if (empty($CFG->messaging)) {
-            // If they have deselected all processors and its a notification mark it read. The user doesn't want to be bothered.
-            // The same goes if the messaging is completely disabled.
-            if ($eventdata->notification) {
-                $savemessage->timeread = null;
-                \core_message\api::mark_notification_as_read($savemessage);
-            } else {
-                \core_message\api::mark_message_as_read($eventdata->userto->id, $savemessage);
-            }
+        if (!$eventdata->notification && empty($CFG->messaging)) {
+            // If it's a message and messaging is disabled mark it read.
+            \core_message\api::mark_message_as_read($eventdata->userto->id, $savemessage);
         }
 
         return $savemessage->id;
@@ -464,17 +482,32 @@ class manager {
      *
      * @param message $eventdata the message object.
      * @param array $processorlist the list of processors for a single user.
+     * @return bool false if error calling message processor
      */
     protected static function call_processors(message $eventdata, array $processorlist) {
+        // Allow plugins to change the message/notification data before sending it.
+        $pluginsfunction = get_plugins_with_function('pre_processor_message_send');
+        $sendmsgsuccessful = true;
         foreach ($processorlist as $procname) {
             // Let new messaging class add custom content based on the processor.
             $proceventdata = ($eventdata instanceof message) ? $eventdata->get_eventobject_for_processor($procname) : $eventdata;
+
+            if ($pluginsfunction) {
+                foreach ($pluginsfunction as $plugintype => $plugins) {
+                    foreach ($plugins as $pluginfunction) {
+                        $pluginfunction($procname, $proceventdata);
+                    }
+                }
+            }
+
             $stdproc = new \stdClass();
             $stdproc->name = $procname;
             $processor = \core_message\api::get_processed_processor_object($stdproc);
             if (!$processor->object->send_message($proceventdata)) {
                 debugging('Error calling message processor ' . $procname);
+                $sendmsgsuccessful = false;
             }
         }
+        return $sendmsgsuccessful;
     }
 }

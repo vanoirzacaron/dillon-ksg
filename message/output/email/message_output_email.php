@@ -90,11 +90,24 @@ class message_output_email extends message_output {
             }
         }
 
-        $result = email_to_user($recipient, $eventdata->userfrom, $eventdata->subject, $eventdata->fullmessage,
-                                $eventdata->fullmessagehtml, $attachment, $attachname, true, $replyto, $replytoname);
+        // We email messages from private conversations straight away, but for group we add them to a table to be sent later.
+        $emailuser = true;
+        if (!$eventdata->notification) {
+            if ($eventdata->conversationtype == \core_message\api::MESSAGE_CONVERSATION_TYPE_GROUP) {
+                $emailuser = false;
+            }
+        }
 
-        if ($result && $notification = $DB->get_record('notifications', ['id' => $eventdata->savedmessageid])) {
-            \core_message\api::mark_notification_as_read($notification);
+        if ($emailuser) {
+            $result = email_to_user($recipient, $eventdata->userfrom, $eventdata->subject, $eventdata->fullmessage,
+                $eventdata->fullmessagehtml, $attachment, $attachname, true, $replyto, $replytoname);
+        } else {
+            $messagetosend = new stdClass();
+            $messagetosend->useridfrom = $eventdata->userfrom->id;
+            $messagetosend->useridto = $recipient->id;
+            $messagetosend->conversationid = $eventdata->convid;
+            $messagetosend->messageid = $eventdata->savedmessageid;
+            $result = $DB->insert_record('message_email_messages', $messagetosend, false);
         }
 
         // Remove an attachment file if any.
@@ -191,7 +204,7 @@ class message_output_email extends message_output {
      * @return int The default settings
      */
     public function get_default_messaging_settings() {
-        return MESSAGE_PERMITTED + MESSAGE_DEFAULT_LOGGEDIN + MESSAGE_DEFAULT_LOGGEDOFF;
+        return MESSAGE_PERMITTED + MESSAGE_DEFAULT_ENABLED;
     }
 
     /**

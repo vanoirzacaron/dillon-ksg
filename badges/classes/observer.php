@@ -14,18 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+defined('MOODLE_INTERNAL') || die();
+
+use \core_badges\badge;
+
 /**
- * Local stuff for category enrolment plugin.
+ * Event observer for badges.
  *
  * @package    core_badges
  * @copyright  2013 Rajesh Taneja <rajesh@moodle.com>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- */
-
-defined('MOODLE_INTERNAL') || die();
-
-/**
- * Event observer for badges.
  */
 class core_badges_observer {
     /**
@@ -70,6 +68,47 @@ class core_badges_observer {
     }
 
     /**
+     * Triggered when '\core\event\competency_evidence_created' event is triggered.
+     *
+     * @param \core\event\competency_evidence_created $event
+     */
+    public static function competency_criteria_review(\core\event\competency_evidence_created $event) {
+        global $DB, $CFG;
+
+        if (!empty($CFG->enablebadges)) {
+            require_once($CFG->dirroot.'/lib/badgeslib.php');
+
+            if (!get_config('core_competency', 'enabled')) {
+                return;
+            }
+
+            $ucid = $event->other['usercompetencyid'];
+            $cid = $event->other['competencyid'];
+            $userid = $event->relateduserid;
+
+            if ($rs = $DB->get_records('badge_criteria_param', array('name' => 'competency_' . $cid, 'value' => $cid))) {
+                foreach ($rs as $r) {
+                    $crit = $DB->get_record('badge_criteria', array('id' => $r->critid), 'badgeid, criteriatype', MUST_EXIST);
+                    $badge = new badge($crit->badgeid);
+                    // Only site badges are updated from site competencies.
+                    if (!$badge->is_active() || $badge->is_issued($userid)) {
+                        continue;
+                    }
+
+                    if ($badge->criteria[$crit->criteriatype]->review($userid)) {
+                        $badge->criteria[$crit->criteriatype]->mark_complete($userid);
+
+                        if ($badge->criteria[BADGE_CRITERIA_TYPE_OVERALL]->review($userid)) {
+                            $badge->criteria[BADGE_CRITERIA_TYPE_OVERALL]->mark_complete($userid);
+                            $badge->issue($userid);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Triggered when 'course_completed' event is triggered.
      *
      * @param \core\event\course_completed $event
@@ -80,7 +119,6 @@ class core_badges_observer {
         if (!empty($CFG->enablebadges)) {
             require_once($CFG->dirroot.'/lib/badgeslib.php');
 
-            $eventdata = $event->get_record_snapshot('course_completions', $event->objectid);
             $userid = $event->relateduserid;
             $courseid = $event->courseid;
 

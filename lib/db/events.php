@@ -21,8 +21,8 @@
  * support this.
  *
  * For more information, take a look to the documentation available:
- *     - Events API: {@link http://docs.moodle.org/dev/Event_2}
- *     - Upgrade API: {@link http://docs.moodle.org/dev/Upgrade_API}
+ *     - Events API: {@link https://docs.moodle.org/dev/Events_API}
+ *     - Upgrade API: {@link https://moodledev.io/docs/guides/upgrade}
  *
  * @package   core
  * @category  event
@@ -62,7 +62,10 @@ $observers = array(
         'eventname'   => '\core\event\cohort_member_added',
         'callback'    => 'core_badges_observer::cohort_criteria_review',
     ),
-
+    array(
+        'eventname'   => '\core\event\competency_evidence_created',
+        'callback'    => 'core_badges_observer::competency_criteria_review',
+    ),
     // Competencies.
     array(
         'eventname'   => '\core\event\course_completed',

@@ -101,8 +101,8 @@ class block extends base {
      * @param   MoodleQuickForm $mform      The form to add configuration to.
      */
     public static function add_disabled_constraints_to_form(\MoodleQuickForm $mform) {
-        $mform->disabledIf('targetvalue_block', 'targettype', 'noteq',
-                \tool_usertours\target::get_target_constant_for_class(get_class()));
+        $mform->hideIf('targetvalue_block', 'targettype', 'noteq',
+                \tool_usertours\target::get_target_constant_for_class(self::class));
     }
 
     /**

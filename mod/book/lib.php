@@ -43,9 +43,12 @@ function book_get_numbering_types() {
 
 /**
  * Returns list of available navigation link types.
+ *
+ * @deprecated since Moodle 4.0. MDL-72376.
  * @return array
  */
 function book_get_nav_types() {
+    debugging("book_get_nav_types() is deprecated. There is no replacement. Navigation is now only next and previous.");
     require_once(__DIR__.'/locallib.php');
 
     return array (
@@ -188,7 +191,7 @@ function book_reset_userdata($data) {
 /**
  * The elements to add the course reset form.
  *
- * @param moodleform $mform
+ * @param MoodleQuickForm $mform
  */
 function book_reset_course_form_definition(&$mform) {
     $mform->addElement('header', 'bookheader', get_string('modulenameplural', 'book'));
@@ -215,17 +218,11 @@ function book_grades($bookid) {
 }
 
 /**
- * This function returns if a scale is being used by one book
- * it it has support for grading and scales. Commented code should be
- * modified if necessary. See book, glossary or journal modules
- * as reference.
- *
- * @param int $bookid
- * @param int $scaleid
- * @return boolean True if the scale is used by any journal
+ * @deprecated since Moodle 3.8
  */
-function book_scale_used($bookid, $scaleid) {
-    return false;
+function book_scale_used() {
+    throw new coding_exception('book_scale_used() can not be used anymore. Plugins can implement ' .
+        '<modname>_scale_used_anywhere, all implementations of <modname>_scale_used are now ignored');
 }
 
 /**
@@ -304,7 +301,7 @@ function book_get_post_actions() {
  * Supported features
  *
  * @param string $feature FEATURE_xx constant for requested feature
- * @return mixed True if module supports feature, false if not, null if doesn't know
+ * @return mixed True if module supports feature, false if not, null if doesn't know or string for the module purpose.
  */
 function book_supports($feature) {
     switch($feature) {
@@ -317,6 +314,7 @@ function book_supports($feature) {
         case FEATURE_GRADE_OUTCOMES:          return false;
         case FEATURE_BACKUP_MOODLE2:          return true;
         case FEATURE_SHOW_DESCRIPTION:        return true;
+        case FEATURE_MOD_PURPOSE:             return MOD_PURPOSE_CONTENT;
 
         default: return null;
     }
@@ -330,7 +328,7 @@ function book_supports($feature) {
  * @return void
  */
 function book_extend_settings_navigation(settings_navigation $settingsnav, navigation_node $booknode) {
-    global $USER, $PAGE, $OUTPUT;
+    global $USER, $OUTPUT;
 
     if ($booknode->children->count() > 0) {
         $firstkey = $booknode->children->get_key_list()[0];
@@ -338,10 +336,10 @@ function book_extend_settings_navigation(settings_navigation $settingsnav, navig
         $firstkey = null;
     }
 
-    $params = $PAGE->url->params();
+    $params = $settingsnav->get_page()->url->params();
 
-    if ($PAGE->cm->modname === 'book' and !empty($params['id']) and !empty($params['chapterid'])
-            and has_capability('mod/book:edit', $PAGE->cm->context)) {
+    if ($settingsnav->get_page()->cm->modname === 'book' and !empty($params['id']) and !empty($params['chapterid'])
+            and has_capability('mod/book:edit', $settingsnav->get_page()->cm->context)) {
         if (!empty($USER->editing)) {
             $string = get_string("turneditingoff");
             $edit = '0';
@@ -351,8 +349,11 @@ function book_extend_settings_navigation(settings_navigation $settingsnav, navig
         }
         $url = new moodle_url('/mod/book/view.php', array('id'=>$params['id'], 'chapterid'=>$params['chapterid'], 'edit'=>$edit, 'sesskey'=>sesskey()));
         $editnode = navigation_node::create($string, $url, navigation_node::TYPE_SETTING);
+        $editnode->set_show_in_secondary_navigation(false);
         $booknode->add_node($editnode, $firstkey);
-        $PAGE->set_button($OUTPUT->single_button($url, $string));
+        if (!$settingsnav->get_page()->theme->haseditswitch) {
+            $settingsnav->get_page()->set_button($OUTPUT->single_button($url, $string));
+        }
     }
 
     $plugins = core_component::get_plugin_list('booktool');
@@ -570,7 +571,7 @@ function book_export_contents($cm, $baseurl) {
     $currentchapter = 0;
 
     foreach ($chapters as $chapter) {
-        if ($chapter->hidden) {
+        if ($chapter->hidden && !has_capability('mod/book:viewhiddenchapters', $context)) {
             continue;
         }
 
@@ -579,6 +580,7 @@ function book_export_contents($cm, $baseurl) {
             "title"     => format_string($chapter->title, true, array('context' => $context)),
             "href"      => $chapter->id . "/index.html",
             "level"     => 0,
+            "hidden"    => $chapter->hidden,
             "subitems"  => array()
         );
 
@@ -611,6 +613,7 @@ function book_export_contents($cm, $baseurl) {
         $chapterindexfile['userid']       = null;
         $chapterindexfile['author']       = null;
         $chapterindexfile['license']      = null;
+        $chapterindexfile['tags']         = \core_tag\external\util::get_item_tags('mod_book', 'book_chapters', $chapter->id);
         $contents[] = $chapterindexfile;
 
         // Chapter files (images usually).
@@ -729,11 +732,9 @@ function mod_book_get_fontawesome_icon_map() {
     return [
         'mod_book:chapter' => 'fa-bookmark-o',
         'mod_book:nav_prev' => 'fa-arrow-left',
-        'mod_book:nav_prev_dis' => 'fa-angle-left',
         'mod_book:nav_sep' => 'fa-minus',
         'mod_book:add' => 'fa-plus',
         'mod_book:nav_next' => 'fa-arrow-right',
-        'mod_book:nav_next_dis' => 'fa-angle-right',
         'mod_book:nav_exit' => 'fa-arrow-up',
     ];
 }

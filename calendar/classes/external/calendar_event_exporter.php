@@ -27,7 +27,6 @@ namespace core_calendar\external;
 defined('MOODLE_INTERNAL') || die();
 
 use \core_calendar\local\event\container;
-use \core_course\external\course_summary_exporter;
 use \renderer_base;
 require_once($CFG->dirroot . '/course/lib.php');
 /**
@@ -51,9 +50,6 @@ class calendar_event_exporter extends event_exporter_base {
         $values['islastday'] = [
             'type' => PARAM_BOOL,
             'default' => false,
-        ];
-        $values['calendareventtype'] = [
-            'type' => PARAM_TEXT,
         ];
         $values['popupname'] = [
             'type' => PARAM_RAW,
@@ -112,7 +108,6 @@ class calendar_event_exporter extends event_exporter_base {
         } else if ($event->get_type() == 'category') {
             $url = $event->get_category()->get_proxied_instance()->get_view_link();
         } else {
-            // TODO MDL-58866 We do not have any way to find urls for events outside of course modules.
             $url = course_get_url($hascourse ? $course : SITEID);
         }
 
@@ -120,7 +115,15 @@ class calendar_event_exporter extends event_exporter_base {
         $values['islastday'] = false;
         $today = $this->related['type']->timestamp_to_date_array($this->related['today']);
 
-        $values['popupname'] = $this->event->get_name();
+        if ($hascourse) {
+            $values['popupname'] = \core_external\util::format_string(
+                $this->event->get_name(),
+                \context_course::instance($course->id),
+                true
+            );
+        } else {
+            $values['popupname'] = \core_external\util::format_string($this->event->get_name(), \context_system::instance(), true);
+        }
 
         $times = $this->event->get_times();
         if ($duration = $times->get_duration()) {
@@ -172,8 +175,6 @@ class calendar_event_exporter extends event_exporter_base {
             $values['popupname'] = get_string('eventnameandcourse', 'calendar', $eventnameparams);
         }
 
-        $values['calendareventtype'] = $this->get_calendar_event_type();
-
         if ($event->get_course_module()) {
             $values = array_merge($values, $this->get_module_timestamp_limits($event));
         } else if ($hascourse && $course->id != SITEID && empty($event->get_group())) {
@@ -217,7 +218,7 @@ class calendar_event_exporter extends event_exporter_base {
      * Return the set of minimum and maximum date timestamp values
      * for the given event.
      *
-     * @param event_interface $event
+     * @param \core_calendar\local\event\entities\event_interface $event
      * @return array
      */
     protected function get_course_timestamp_limits($event) {
@@ -255,7 +256,7 @@ class calendar_event_exporter extends event_exporter_base {
      * Return the set of minimum and maximum date timestamp values
      * for the given event.
      *
-     * @param event_interface $event
+     * @param \core_calendar\local\event\entities\event_interface $event
      * @return array
      */
     protected function get_module_timestamp_limits($event) {
@@ -375,8 +376,8 @@ class calendar_event_exporter extends event_exporter_base {
      * and the module's minimum timestamp limit.
      *
      * @deprecated since Moodle 3.6. Please use get_timestamp_min_limit().
-     * @todo final deprecation. To be removed in Moodle 4.0
-     * @param DateTimeInterface $starttime The event start time
+     * @todo final deprecation. To be removed in Moodle 3.10
+     * @param \DateTimeInterface $starttime The event start time
      * @param array $min The module's minimum limit for the event
      * @return array Returns an array with mindaytimestamp and mindayerror keys.
      */
@@ -391,8 +392,8 @@ class calendar_event_exporter extends event_exporter_base {
      * and the module's maximum timestamp limit.
      *
      * @deprecated since Moodle 3.6. Please use get_timestamp_max_limit().
-     * @todo final deprecation. To be removed in Moodle 4.0
-     * @param DateTimeInterface $starttime The event start time
+     * @todo final deprecation. To be removed in Moodle 3.10
+     * @param \DateTimeInterface $starttime The event start time
      * @param array $max The module's maximum limit for the event
      * @return array Returns an array with maxdaytimestamp and maxdayerror keys.
      */

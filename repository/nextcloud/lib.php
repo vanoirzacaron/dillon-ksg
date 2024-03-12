@@ -93,6 +93,12 @@ class repository_nextcloud extends repository {
     private $controlledlinkfoldername;
 
     /**
+     * Curl instance that can be used to fetch file from nextcloud instance.
+     * @var curl
+     */
+    private $curl;
+
+    /**
      * repository_nextcloud constructor.
      *
      * @param int $repositoryid
@@ -143,6 +149,7 @@ class repository_nextcloud extends repository {
         }
 
         $this->ocsclient = new ocs_client($this->get_user_oauth_client());
+        $this->curl = new curl();
     }
 
     /**
@@ -291,6 +298,7 @@ class repository_nextcloud extends repository {
      *
      */
     public function get_link($url) {
+        // Create a read only public link, remember no update possible in this file/folder.
         $ocsparams = [
             'path' => $url,
             'shareType' => ocs_client::SHARE_TYPE_PUBLIC,
@@ -319,9 +327,16 @@ class repository_nextcloud extends repository {
      * This method does not do any translation of the file source.
      *
      * @param string $source source of the file, returned by repository as 'source' and received back from user (not cleaned)
-     * @return string file reference, ready to be stored
+     * @return string file reference, ready to be stored or json encoded string for public link reference
      */
     public function get_file_reference($source) {
+        $usefilereference = optional_param('usefilereference', false, PARAM_BOOL);
+        if ($usefilereference) {
+            return json_encode([
+                'type' => 'FILE_REFERENCE',
+                'link' => $this->get_link($source),
+            ]);
+        }
         // The simple relative path to the file is enough.
         return $source;
     }
@@ -420,6 +435,12 @@ class repository_nextcloud extends repository {
         $repositoryname = $this->get_name();
         $reference = json_decode($storedfile->get_reference());
 
+        // If the file is a reference which means its a public link in nextcloud.
+        if ($reference->type === 'FILE_REFERENCE') {
+            // This file points to the public link just fetch the latest one from nextcloud repo.
+            redirect($reference->link);
+        }
+
         // 1. assure the client and user is logged in.
         if (empty($this->client) || $this->get_system_oauth_client() === false || $this->get_system_ocs_client() === null) {
             $details = get_string('contactadminwith', 'repository_nextcloud',
@@ -427,11 +448,25 @@ class repository_nextcloud extends repository {
             throw new \repository_nextcloud\request_exception(array('instance' => $repositoryname, 'errormessage' => $details));
         }
 
+        // Download for offline usage. This is strictly read-only, so the file need not be shared.
+        if (!empty($options['offline'])) {
+            // Download from system account and provide the file to the user.
+            $linkmanager = new \repository_nextcloud\access_controlled_link_manager($this->ocsclient,
+                $this->get_system_oauth_client(), $this->get_system_ocs_client(), $this->issuer, $repositoryname);
+
+            // Create temp path, then download into it.
+            $filename = basename($reference->link);
+            $tmppath = make_request_directory() . '/' . $filename;
+            $linkmanager->download_for_offline_usage($reference->link, $tmppath);
+
+            // Output the obtained file to the user and remove it from disk.
+            send_temp_file($tmppath, $filename);
+
+            // That's all.
+            return;
+        }
+
         if (!$this->client->is_logged_in()) {
-            if (!empty($options['offline'])) {
-                // Right now, we can't download referenced files for offline if the client is not authenticated.
-                send_file_not_found();  // Use this function because it enforces a 404 error.
-            }
             $this->print_login_popup(['style' => 'margin-top: 250px'], $options['embed']);
             return;
         }
@@ -560,7 +595,7 @@ class repository_nextcloud extends repository {
             $returnurl->param('repo_id', $this->id);
             $returnurl->param('sesskey', sesskey());
         }
-        $this->client = \core\oauth2\api::get_user_oauth_client($this->issuer, $returnurl, self::SCOPES);
+        $this->client = \core\oauth2\api::get_user_oauth_client($this->issuer, $returnurl, self::SCOPES, true);
         return $this->client;
     }
 
@@ -737,10 +772,10 @@ class repository_nextcloud extends repository {
             } else if ($setting === 'external') {
                 return FILE_CONTROLLED_LINK;
             } else {
-                return FILE_CONTROLLED_LINK | FILE_INTERNAL;
+                return FILE_CONTROLLED_LINK | FILE_INTERNAL | FILE_REFERENCE;
             }
         } else {
-            return FILE_INTERNAL;
+            return FILE_INTERNAL | FILE_REFERENCE;
         }
     }
 
@@ -780,7 +815,7 @@ class repository_nextcloud extends repository {
 
                 $folders[strtoupper($title)] = array(
                     'title' => rtrim($title, '/'),
-                    'thumbnail' => $OUTPUT->image_url(file_folder_icon(90))->out(false),
+                    'thumbnail' => $OUTPUT->image_url(file_folder_icon())->out(false),
                     'children' => array(),
                     'datemodified' => $item['lastmodified'],
                     'path' => $item['href']
@@ -790,7 +825,7 @@ class repository_nextcloud extends repository {
                 $size = !empty($item['getcontentlength']) ? $item['getcontentlength'] : '';
                 $files[strtoupper($title)] = array(
                     'title' => $title,
-                    'thumbnail' => $OUTPUT->image_url(file_extension_icon($title, 90))->out(false),
+                    'thumbnail' => $OUTPUT->image_url(file_extension_icon($title))->out(false),
                     'size' => $size,
                     'datemodified' => $item['lastmodified'],
                     'source' => $item['href']
@@ -822,7 +857,7 @@ class repository_nextcloud extends repository {
         echo $OUTPUT->header();
 
         $button = new single_button($url, get_string('logintoaccount', 'repository', $this->get_name()),
-            'post', true);
+            'post', single_button::BUTTON_PRIMARY);
         $button->add_action(new popup_action('click', $url, 'Login'));
         $button->class = 'mdl-align';
         $button = $OUTPUT->render($button);
@@ -852,6 +887,7 @@ class repository_nextcloud extends repository {
             'defaultreturntype' => $this->default_returntype(),
             'manage' => $this->issuer->get('baseurl'), // Provide button to go into file management interface quickly.
             'list' => array(), // Contains all file/folder information and is required to build the file/folder tree.
+            'filereferencewarning' => get_string('externalpubliclinkwarning', 'repository_nextcloud'),
         ];
 
         // If relative path is a non-top-level path, calculate all its parents' paths.
@@ -894,5 +930,66 @@ class repository_nextcloud extends repository {
         }
 
         return $path;
+    }
+
+    /**
+     * Synchronize the external file if there is an update happened to it.
+     *
+     * If the file has been updated in the nextcloud instance, this method
+     * would take care of the file we copy into the moodle file pool.
+     *
+     * The call to this method reaches from stored_file::sync_external_file()
+     *
+     * @param stored_file $file
+     * @return bool true if synced successfully else false if not ready to sync or reference link not set
+     */
+    public function sync_reference(stored_file $file):bool {
+        global $CFG;
+
+        if ($file->get_referencelastsync() + DAYSECS > time()) {
+            // Synchronize once per day.
+            return false;
+        }
+
+        $reference = json_decode($file->get_reference());
+
+        if (!isset($reference->link)) {
+            return false;
+        }
+
+        $url = $reference->link;
+        if (file_extension_in_typegroup($file->get_filepath() . $file->get_filename(), 'web_image')) {
+            $saveas = $this->prepare_file(uniqid());
+            try {
+                $result = $this->curl->download_one($url, [], [
+                    'filepath' => $saveas,
+                    'timeout' => $CFG->repositorysyncimagetimeout,
+                    'followlocation' => true,
+                ]);
+
+                $info = $this->curl->get_info();
+
+                if ($result === true && isset($info['http_code']) && $info['http_code'] === 200) {
+                    $file->set_synchronised_content_from_file($saveas);
+                    return true;
+                }
+            } catch (Exception $e) {
+                // If the download fails lets download with get().
+                $this->curl->get($url, null, ['timeout' => $CFG->repositorysyncimagetimeout, 'followlocation' => true, 'nobody' => true]);
+                $info = $this->curl->get_info();
+
+                if (isset($info['http_code']) && $info['http_code'] === 200 &&
+                    array_key_exists('download_content_length', $info) &&
+                    $info['download_content_length'] >= 0) {
+                        $filesize = (int)$info['download_content_length'];
+                        $file->set_synchronized(null, $filesize);
+                        return true;
+                }
+
+                $file->set_missingsource();
+                return true;
+            }
+        }
+        return false;
     }
 }

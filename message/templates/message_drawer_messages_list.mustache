@@ -41,13 +41,20 @@
         data-route="view-conversation"
         {{#conversationid}}
             data-route-param-1="{{.}}"
+            {{#frompanel}}
+                data-route-param-2="frompanel"
+            {{/frompanel}}
         {{/conversationid}}
         {{^conversationid}}
             data-route-param-1="false"
             data-route-param-2="create"
             data-route-param-3="{{userid}}"
+            {{#frompanel}}
+                data-route-param-4="frompanel"
+            {{/frompanel}}
         {{/conversationid}}
         data-conversation-id="{{conversationid}}"
+        role="button"
     >
         <img
             class="rounded-circle"
@@ -79,18 +86,18 @@
             </div>
             <p class="m-0 font-weight-light text-truncate" data-region="last-message">
                 {{#sentfromcurrentuser}}{{#str}} you, core_message {{/str}}{{/sentfromcurrentuser}}
-                {{lastmessage}}
+                <span>{{{lastmessage}}}</span>
             </p>
         </div>
 
         <span
-            class="badge badge-pill badge-primary bg-primary {{^unreadcount}}hidden{{/unreadcount}}"
+            class="badge badge-pill badge-primary {{^unreadcount}}hidden{{/unreadcount}}"
             data-region="unread-count"
         >
             {{unreadcount}}
         </span>
 
-        <div class="text-muted">
+        <div>
             {{> core_message/message_drawer_icon_forward }}
         </div>
     </a>

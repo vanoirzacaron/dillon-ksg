@@ -19,7 +19,7 @@
  *
  * The UI mockup has been proposed in MDL-18688
  * It uses the standard core Moodle formslib. For more info about them, please
- * visit: http://docs.moodle.org/dev/lib/formslib.php
+ * visit: https://moodledev.io/docs/apis/subsystems/form
  *
  * @package    mod_workshop
  * @copyright  2009 David Mudrak <david.mudrak@gmail.com>
@@ -32,6 +32,7 @@ require_once($CFG->dirroot . '/course/moodleform_mod.php');
 require_once(__DIR__ . '/locallib.php');
 require_once($CFG->libdir . '/filelib.php');
 
+use core_grades\component_gradeitems;
 /**
  * Module settings form for Workshop instances
  */
@@ -96,10 +97,9 @@ class mod_workshop_mod_form extends moodleform_mod {
         $mform->setDefault('grade', $workshopconfig->grade);
         $mform->addHelpButton('submissiongradegroup', 'submissiongrade', 'workshop');
 
-        $mform->addElement('text', 'submissiongradepass', get_string('gradetopasssubmission', 'workshop'));
+        $mform->addElement('float', 'submissiongradepass', get_string('gradetopasssubmission', 'workshop'));
         $mform->addHelpButton('submissiongradepass', 'gradepass', 'grades');
         $mform->setDefault('submissiongradepass', '');
-        $mform->setType('submissiongradepass', PARAM_RAW);
 
         $label = get_string('gradinggrade', 'workshop');
         $mform->addGroup(array(
@@ -109,10 +109,9 @@ class mod_workshop_mod_form extends moodleform_mod {
         $mform->setDefault('gradinggrade', $workshopconfig->gradinggrade);
         $mform->addHelpButton('gradinggradegroup', 'gradinggrade', 'workshop');
 
-        $mform->addElement('text', 'gradinggradepass', get_string('gradetopassgrading', 'workshop'));
+        $mform->addElement('float', 'gradinggradepass', get_string('gradetopassgrading', 'workshop'));
         $mform->addHelpButton('gradinggradepass', 'gradepass', 'grades');
         $mform->setDefault('gradinggradepass', '');
-        $mform->setType('gradinggradepass', PARAM_RAW);
 
         $options = array();
         for ($i = 5; $i >= 0; $i--) {
@@ -151,17 +150,17 @@ class mod_workshop_mod_form extends moodleform_mod {
         $label = get_string('nattachments', 'workshop');
         $mform->addElement('select', 'nattachments', $label, $options);
         $mform->setDefault('nattachments', 1);
-        $mform->disabledIf('nattachments', 'submissiontypefileavailable');
+        $mform->hideIf('nattachments', 'submissiontypefileavailable');
 
         $label = get_string('allowedfiletypesforsubmission', 'workshop');
         $mform->addElement('filetypes', 'submissionfiletypes', $label);
         $mform->addHelpButton('submissionfiletypes', 'allowedfiletypesforsubmission', 'workshop');
-        $mform->disabledIf('submissionfiletypes', 'submissiontypefileavailable');
+        $mform->hideIf('submissionfiletypes', 'submissiontypefileavailable');
 
         $options = get_max_upload_sizes($CFG->maxbytes, $this->course->maxbytes, 0, $workshopconfig->maxbytes);
         $mform->addElement('select', 'maxbytes', get_string('maxbytes', 'workshop'), $options);
         $mform->setDefault('maxbytes', $workshopconfig->maxbytes);
-        $mform->disabledIf('maxbytes', 'submissiontypefileavailable');
+        $mform->hideIf('maxbytes', 'submissiontypefileavailable');
 
         $label = get_string('latesubmissions', 'workshop');
         $text = get_string('latesubmissions_desc', 'workshop');
@@ -196,18 +195,18 @@ class mod_workshop_mod_form extends moodleform_mod {
         }
         $mform->addElement('select', 'overallfeedbackfiles', get_string('overallfeedbackfiles', 'workshop'), $options);
         $mform->setDefault('overallfeedbackfiles', 0);
-        $mform->disabledIf('overallfeedbackfiles', 'overallfeedbackmode', 'eq', 0);
+        $mform->hideIf('overallfeedbackfiles', 'overallfeedbackmode', 'eq', 0);
 
         $label = get_string('allowedfiletypesforoverallfeedback', 'workshop');
         $mform->addElement('filetypes', 'overallfeedbackfiletypes', $label);
         $mform->addHelpButton('overallfeedbackfiletypes', 'allowedfiletypesforoverallfeedback', 'workshop');
-        $mform->disabledIf('overallfeedbackfiletypes', 'overallfeedbackfiles', 'eq', 0);
+        $mform->hideIf('overallfeedbackfiletypes', 'overallfeedbackfiles', 'eq', 0);
 
         $options = get_max_upload_sizes($CFG->maxbytes, $this->course->maxbytes);
         $mform->addElement('select', 'overallfeedbackmaxbytes', get_string('overallfeedbackmaxbytes', 'workshop'), $options);
         $mform->setDefault('overallfeedbackmaxbytes', $workshopconfig->maxbytes);
-        $mform->disabledIf('overallfeedbackmaxbytes', 'overallfeedbackmode', 'eq', 0);
-        $mform->disabledIf('overallfeedbackmaxbytes', 'overallfeedbackfiles', 'eq', 0);
+        $mform->hideIf('overallfeedbackmaxbytes', 'overallfeedbackmode', 'eq', 0);
+        $mform->hideIf('overallfeedbackmaxbytes', 'overallfeedbackfiles', 'eq', 0);
 
         $label = get_string('conclusion', 'workshop');
         $mform->addElement('editor', 'conclusioneditor', $label, null,
@@ -226,7 +225,7 @@ class mod_workshop_mod_form extends moodleform_mod {
         $options = workshop::available_example_modes_list();
         $mform->addElement('select', 'examplesmode', $label, $options);
         $mform->setDefault('examplesmode', $workshopconfig->examplesmode);
-        $mform->disabledIf('examplesmode', 'useexamples');
+        $mform->hideIf('examplesmode', 'useexamples');
 
         // Availability ---------------------------------------------------------------
         $mform->addElement('header', 'accesscontrol', get_string('availability', 'core'));
@@ -239,7 +238,7 @@ class mod_workshop_mod_form extends moodleform_mod {
 
         $label = get_string('submissionendswitch', 'mod_workshop');
         $mform->addElement('checkbox', 'phaseswitchassessment', $label);
-        $mform->disabledIf('phaseswitchassessment', 'submissionend[enabled]');
+        $mform->hideIf('phaseswitchassessment', 'submissionend[enabled]');
         $mform->addHelpButton('phaseswitchassessment', 'submissionendswitch', 'mod_workshop');
 
         $label = get_string('assessmentstart', 'workshop');
@@ -247,9 +246,6 @@ class mod_workshop_mod_form extends moodleform_mod {
 
         $label = get_string('assessmentend', 'workshop');
         $mform->addElement('date_time_selector', 'assessmentend', $label, array('optional' => true));
-
-        $coursecontext = context_course::instance($this->course->id);
-        plagiarism_get_form_elements_module($mform, $coursecontext, 'mod_workshop');
 
         // Common module settings, Restrict availability, Activity completion etc. ----
         $features = array('groups' => true, 'groupings' => true,
@@ -458,6 +454,30 @@ class mod_workshop_mod_form extends moodleform_mod {
                 if ($gradepassfloat > $data['gradinggrade']) {
                     $errors['gradinggradepass'] = get_string('gradepassgreaterthangrade', 'grades', $data['gradinggrade']);
                 }
+            }
+        }
+
+        // We need to do a custom completion validation because workshop grade items identifiers divert from standard.
+        // Refer to validation defined in moodleform_mod.php.
+        if (isset($data['completionpassgrade']) && $data['completionpassgrade'] &&
+            isset($data['completiongradeitemnumber'])) {
+            $itemnames = component_gradeitems::get_itemname_mapping_for_component('mod_workshop');
+            $gradepassfield = $itemnames[(int) $data['completiongradeitemnumber']] . 'gradepass';
+            // We need to make all the validations related with $gradepassfield
+            // with them being correct floats, keeping the originals unmodified for
+            // later validations / showing the form back...
+            // TODO: Note that once MDL-73994 is fixed we'll have to re-visit this and
+            // adapt the code below to the new values arriving here, without forgetting
+            // the special case of empties and nulls.
+            $gradepass = isset($data[$gradepassfield]) ? unformat_float($data[$gradepassfield]) : null;
+            if (is_null($gradepass) || $gradepass == 0) {
+                $errors['completionpassgrade'] = get_string(
+                    'activitygradetopassnotset',
+                    'completion'
+                );
+            } else {
+                // We have validated grade pass. Unset any errors.
+                unset($errors['completionpassgrade']);
             }
         }
 

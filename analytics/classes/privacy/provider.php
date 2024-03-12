@@ -96,6 +96,26 @@ class provider implements
             'privacy:metadata:analytics:predictionactions'
         );
 
+        // Regarding this block, we are unable to export or purge this data, as
+        // it would damage the analytics data across the whole site.
+        $collection->add_database_table(
+            'analytics_models',
+            [
+                'usermodified' => 'privacy:metadata:analytics:analyticsmodels:usermodified',
+            ],
+            'privacy:metadata:analytics:analyticsmodels'
+        );
+
+        // Regarding this block, we are unable to export or purge this data, as
+        // it would damage the analytics log data across the whole site.
+        $collection->add_database_table(
+            'analytics_models_log',
+            [
+                'usermodified' => 'privacy:metadata:analytics:analyticsmodelslog:usermodified',
+            ],
+            'privacy:metadata:analytics:analyticsmodelslog'
+        );
+
         return $collection;
     }
 
@@ -306,13 +326,9 @@ class provider implements
             $idssql = "SELECT ap.id FROM {analytics_predictions} ap
                         WHERE ap.contextid = :contextid AND ap.modelid = :modelid";
             $idsparams = ['contextid' => $context->id, 'modelid' => $modelid];
-            $predictionids = $DB->get_fieldset_sql($idssql, $idsparams);
-            if ($predictionids) {
-                list($predictionidssql, $params) = $DB->get_in_or_equal($predictionids, SQL_PARAMS_NAMED);
 
-                $DB->delete_records_select('analytics_prediction_actions', "predictionid IN ($idssql)", $idsparams);
-                $DB->delete_records_select('analytics_predictions', "id $predictionidssql", $params);
-            }
+            $DB->delete_records_select('analytics_prediction_actions', "predictionid IN ($idssql)", $idsparams);
+            $DB->delete_records_select('analytics_predictions', "contextid = :contextid AND modelid = :modelid", $idsparams);
         }
 
         // We delete them all this table is just a cache and we don't know which model filled it.

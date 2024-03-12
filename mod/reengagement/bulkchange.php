@@ -55,7 +55,7 @@ if (!empty($userids)) {
     $userids = explode(',', $userids);
 }
 // First initial post from view.php - users stored in array as "userX" => "on" - get the userids.
-if (empty($userids) and $post = data_submitted()) {
+if (empty($userids) && $post = data_submitted()) {
     foreach ($post as $k => $v) {
         if (preg_match('/^user(\d+)$/', $k, $m)) {
             $userids[] = $m[1];
@@ -94,7 +94,7 @@ if ($formaction == 'resetbyspecificdate') {
     exit;
 }
 
-$usernamefields = get_all_user_name_fields(true, 'u');
+$usernamefields = \core_user\fields::for_name()->get_sql($alias = 'u', false, '', '',  false)->selects;
 list($usql, $params) = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED, 'u');
 
 if ($formaction == 'resetbyfirstaccess') {

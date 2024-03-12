@@ -163,7 +163,7 @@ abstract class sql_generator {
     /** @var string The prefix to be used for all the DB objects.*/
     public $prefix;
 
-    /** @var string List of reserved words (in order to quote them properly).*/
+    /** @var array List of reserved words (in order to quote them properly).*/
     public $reserved_words;
 
     /** @var moodle_database The moodle_database instance.*/
@@ -653,7 +653,7 @@ abstract class sql_generator {
     }
 
     /**
-     * Given one correct xmldb_table and the new name, returns the SQL statements
+     * Given one correct xmldb_table, returns the SQL statements
      * to drop it (inside one array). Works also for temporary tables.
      *
      * @param xmldb_table $xmldb_table The table to drop.
@@ -672,6 +672,17 @@ abstract class sql_generator {
         $results = array_merge($results, $extra_sentences);
 
         return $results;
+    }
+
+    /**
+     * Performs any clean up that needs to be done after a table is dropped.
+     *
+     * @param xmldb_table $table
+     */
+    public function cleanup_after_drop(xmldb_table $table): void {
+        if ($this->temptables->is_temptable($table->getName())) {
+            $this->temptables->delete_temptable($table->getName());
+        }
     }
 
     /**
@@ -738,7 +749,7 @@ abstract class sql_generator {
      * @param string $skip_type_clause The type clause on alter columns, NULL by default.
      * @param string $skip_default_clause The default clause on alter columns, NULL by default.
      * @param string $skip_notnull_clause The null/notnull clause on alter columns, NULL by default.
-     * @return string The field altering SQL statement.
+     * @return array The field altering SQL statement.
      */
     public function getAlterFieldSQL($xmldb_table, $xmldb_field, $skip_type_clause = NULL, $skip_default_clause = NULL, $skip_notnull_clause = NULL) {
 
@@ -1152,7 +1163,7 @@ abstract class sql_generator {
     /**
      * Given one XMLDB Statement, build the needed SQL insert sentences to execute it.
      *
-     * @param string $statement SQL statement.
+     * @param mixed $statement SQL statement.
      * @return array Array of sentences in the SQL statement.
      */
     function getExecuteInsertSQL($statement) {
@@ -1226,7 +1237,7 @@ abstract class sql_generator {
         }
 
         // Now call the standard $DB->sql_concat() DML function
-        return call_user_func_array(array($this->mdb, 'sql_concat'), $elements);
+        return call_user_func_array(array($this->mdb, 'sql_concat'), array_values($elements));
     }
 
     /**
