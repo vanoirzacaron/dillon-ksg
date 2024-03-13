@@ -23,8 +23,6 @@
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * Backup plugin class.
  *
@@ -131,6 +129,20 @@ class backup_local_recompletion_plugin extends backup_local_plugin {
             $scotrack->set_source_table('local_recompletion_sst', array('course' => backup::VAR_COURSEID));
         }
         $scotrack->annotate_ids('user', 'userid');
+
+        // Now deal with choice archive tables.
+        $choiceanswers = new backup_nested_element('choiceanswers');
+
+        $choiceanswer = new backup_nested_element('choiceanswer', array('id'), array(
+            'choiceid', 'userid', 'optionid', 'timemodified', 'choice'));
+
+        $recompletion->add_child($choiceanswers);
+        $choiceanswers->add_child($choiceanswer);
+
+        if ($usercompletion) {
+            $choiceanswer->set_source_table('local_recompletion_cha', array('course' => backup::VAR_COURSEID));
+        }
+        $choiceanswer->annotate_ids('user', 'userid');
 
         return $plugin;
     }

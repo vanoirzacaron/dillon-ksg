@@ -15,19 +15,28 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * URKUND observers.
+ * Participants table filterset.
  *
  * @package    local_recompletion
- * @author     Dan Marsden http://danmarsden.com
- * @copyright  2020 Catalyst IT
+ * @copyright  2021 Catalyst IT
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
+declare(strict_types=1);
 
-$observers = array (
-    array(
-        'eventname' => '\mod_assign\event\submission_graded',
-        'callback' => 'local_recompletion_observer::submission_graded'
-    ),
-);
+namespace local_recompletion\table;
+
+use core_table\local\filter\filterset;
+use core_table\local\filter\integer_filter;
+use core_table\local\filter\string_filter;
+
+/**
+ * Participants table filterset.
+ *
+ * @package    local_recompletion
+ * @copyright  2021 Catalyst IT
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+class participants_filterset extends \core_user\table\participants_filterset {
+    // Helper class for ajax to get the right filter.
+}
