@@ -57,7 +57,7 @@ class backup_reengagement_activity_task extends backup_activity_task {
      * @param string $content
      * @return string
      */
-    public static function encode_content_links($content) {
+    static public function encode_content_links($content) {
         global $CFG;
 
         $base = preg_quote($CFG->wwwroot, "/");

@@ -174,10 +174,9 @@ class reengagement_participants extends \table_sql implements dynamic_table {
         $headers[] = get_string('fullname');
         $columns[] = 'fullname';
 
-        $extrafields = \core_user\fields::for_identity($this->context)->get_required_fields();
-
+        $extrafields = get_extra_user_fields($this->context);
         foreach ($extrafields as $field) {
-            $headers[] = \core_user\fields::get_display_name($field);
+            $headers[] = get_user_field_name($field);
             $columns[] = $field;
         }
 
@@ -410,7 +409,7 @@ class reengagement_participants extends \table_sql implements dynamic_table {
      * @return string
      */
     public function col_emailtime($data) {
-        return $data->emailtime ? userdate($data->emailtime, get_string('strftimedatetimeshort', 'langconfig')) : '-';
+        return userdate($data->emailtime, get_string('strftimedatetimeshort', 'langconfig'));
     }
 
     /**
@@ -420,7 +419,7 @@ class reengagement_participants extends \table_sql implements dynamic_table {
      * @return string
      */
     public function col_completiontime($data) {
-        return $data->completiontime ? userdate($data->completiontime, get_string('strftimedatetimeshort', 'langconfig')) : '-';
+        return userdate($data->completiontime, get_string('strftimedatetimeshort', 'langconfig'));
     }
 
     /**

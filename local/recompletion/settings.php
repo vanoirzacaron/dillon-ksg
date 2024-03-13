@@ -22,8 +22,6 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-use local_recompletion\admin_setting_configstrtotime;
-
 defined('MOODLE_INTERNAL') || die;
 
 if ($hassiteconfig) {
@@ -31,32 +29,6 @@ if ($hassiteconfig) {
     require_once($CFG->dirroot . '/local/recompletion/locallib.php');
     $settings = new admin_settingpage('local_recompletion', new lang_string('defaultsettings', 'local_recompletion'));
     $ADMIN->add('localplugins', $settings);
-
-    // Type of recompletion - range(duration) or schedule(absolute times, based on cron schedule).
-    $settings->add(new admin_setting_configselect('local_recompletion/recompletiontype',
-        new lang_string('recompletiontype', 'local_recompletion'),
-        new lang_string('recompletiontype_help', 'local_recompletion'), 'range', [
-            local_recompletion_recompletion_form::RECOMPLETION_TYPE_DISABLED => get_string(
-                'recompletiontype:disabled',
-                'local_recompletion'
-            ),
-            local_recompletion_recompletion_form::RECOMPLETION_TYPE_PERIOD => get_string(
-                'recompletiontype:period',
-                'local_recompletion',
-            ),
-            local_recompletion_recompletion_form::RECOMPLETION_TYPE_ONDEMAND => get_string(
-                'recompletiontype:ondemand',
-                'local_recompletion',
-            ),
-            local_recompletion_recompletion_form::RECOMPLETION_TYPE_SCHEDULE => get_string(
-                'recompletiontype:schedule',
-                'local_recompletion',
-            ),
-        ]));
-
-    $settings->add(new admin_setting_configstrtotime('local_recompletion/schedule',
-        new lang_string('recompletionschedule', 'local_recompletion'),
-        new lang_string('recompletionschedule_help', 'local_recompletion'), 'Jan 1', PARAM_TEXT));
 
     $settings->add(new admin_setting_configduration('local_recompletion/duration',
         new lang_string('recompletionrange', 'local_recompletion'),
@@ -70,13 +42,9 @@ if ($hassiteconfig) {
         new lang_string('recompletionemailsubject', 'local_recompletion'),
         new lang_string('recompletionemailsubject_help', 'local_recompletion'), '', PARAM_TEXT));
 
-    $settings->add(new admin_setting_confightmleditor('local_recompletion/emailbody',
+    $settings->add(new admin_setting_configtextarea('local_recompletion/emailbody',
         new lang_string('recompletionemailbody', 'local_recompletion'),
         new lang_string('recompletionemailbody_help', 'local_recompletion'), ''));
-
-    $settings->add(new admin_setting_configcheckbox('local_recompletion/unenrolenable',
-        new lang_string('recompletionunenrolenable', 'local_recompletion'),
-        new lang_string('recompletionunenrolenable_help', 'local_recompletion'), 0));
 
     $settings->add(new admin_setting_configcheckbox('local_recompletion/deletegradedata',
         new lang_string('deletegradedata', 'local_recompletion'),
@@ -86,30 +54,30 @@ if ($hassiteconfig) {
         new lang_string('archivecompletiondata', 'local_recompletion'),
         new lang_string('archivecompletiondata_help', 'local_recompletion'), 1));
 
-    $settings->add(new admin_setting_configcheckbox('local_recompletion/forcearchivecompletiondata',
-        new lang_string('forcearchivecompletiondata', 'local_recompletion'),
-        new lang_string('forcearchivecompletiondata_help', 'local_recompletion'), 0));
+    $choices = array(LOCAL_RECOMPLETION_NOTHING => get_string('donothing', 'local_recompletion'),
+                     LOCAL_RECOMPLETION_DELETE => get_string('delete', 'local_recompletion'));
 
-    $settings->add(new admin_setting_heading('local_recompletion/pluginsettings',
-        get_string('pluginssettings', 'local_recompletion'),
-        ''
-    ));
+    $settings->add(new admin_setting_configselect('local_recompletion/scormattempts',
+        new lang_string('scormattempts', 'local_recompletion'),
+        new lang_string('scormattempts_help', 'local_recompletion'), LOCAL_RECOMPLETION_NOTHING, $choices));
 
-    $plugins = local_recompletion_get_supported_plugins();
-    foreach ($plugins as $plugin) {
-        $fqn = 'local_recompletion\\plugins\\' . $plugin;
-        $fqn::settings($settings);
-    }
+    $settings->add(new admin_setting_configcheckbox('local_recompletion/archivescormdata',
+        new lang_string('archivescormdata', 'local_recompletion'), '', 1));
 
-    $settings->add(new admin_setting_heading('local_recompletion/restrictionsettings',
-        get_string('restrictionsettings', 'local_recompletion'),
-        ''
-    ));
+    $choices[LOCAL_RECOMPLETION_EXTRAATTEMPT] = get_string('extraattempt', 'local_recompletion');
+    $settings->add(new admin_setting_configselect('local_recompletion/quizattempts',
+        new lang_string('quizattempts', 'local_recompletion'),
+        new lang_string('quizattempts_help', 'local_recompletion'), LOCAL_RECOMPLETION_NOTHING, $choices));
 
-    $restrictions = local_recompletion_get_supported_restrictions();
-    foreach ($restrictions as $plugin) {
-        $fqn = 'local_recompletion\\local\\restrictions\\' . $plugin;
-        $fqn::settings($settings);
-    }
+    $settings->add(new admin_setting_configcheckbox('local_recompletion/archivequizdata',
+        new lang_string('archivequizdata', 'local_recompletion'), '', 1));
 
+    unset($choices[LOCAL_RECOMPLETION_DELETE]); // Not supported in assign.
+    $settings->add(new admin_setting_configselect('local_recompletion/assignattempts',
+        new lang_string('assignattempts', 'local_recompletion'),
+        new lang_string('assignattempts_help', 'local_recompletion'), LOCAL_RECOMPLETION_NOTHING, $choices));
+
+    $settings->add(new admin_setting_configcheckbox('local_recompletion/assignevent',
+        new lang_string('assignevent', 'local_recompletion'),
+        '', 0));
 }

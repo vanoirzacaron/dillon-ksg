@@ -34,10 +34,12 @@ $id = required_param('id', PARAM_INT);
 if ($id) {
     if ($id == SITEID) {
         // Don't allow editing of 'site course' using this form.
-        throw new moodle_exception('cannoteditsiteform');
+        print_error('cannoteditsiteform');
     }
-    $course = $DB->get_record('course', ['id' => $id], '*', MUST_EXIST);
 
+    if (!$course = $DB->get_record('course', array('id' => $id))) {
+        print_error('invalidcourseid');
+    }
     require_login($course);
     $context = context_course::instance($course->id);
     require_capability('local/recompletion:manage', $context);
@@ -46,90 +48,50 @@ if ($id) {
 
     // Check if completion is enabled site-wide, or for the course.
     if (!$completion->is_enabled()) {
-        throw new moodle_exception('completionnotenabled', 'local_recompletion');
+        print_error('completionnotenabled', 'local_recompletion');
     }
 
 } else {
     require_login();
-    throw new moodle_exception('needcourseid');
+    print_error('needcourseid');
 }
 
 // Set up the page.
 $PAGE->set_course($course);
-$PAGE->set_url('/local/recompletion/recompletion.php', ['id' => $course->id]);
+$PAGE->set_url('/local/recompletion/recompletion.php', array('id' => $course->id));
 $PAGE->set_title($course->shortname);
 $PAGE->set_heading($course->fullname);
 $PAGE->set_pagelayout('admin');
 
-$config = $DB->get_records_list('local_recompletion_config', 'course', [$course->id], '', 'name, id, value');
-// If forcearchive completed is set, make sure the UI shows it as ticked too.
-if (!empty(get_config('local_recompletion', 'forcearchivecompletiondata'))) {
-    if (!empty($config['archivecompletiondata']) && $config['archivecompletiondata']->value == 0) {
-        $config['archivecompletiondata']->value = 1;
-    }
-}
+// This seems a bit messy - would be nice to tidy this up a bit.
+$config = $DB->get_records_menu('local_recompletion_config', array('course' => $course->id), '', 'name, value');
+$idmap = $DB->get_records_menu('local_recompletion_config', array('course' => $course->id), '', 'name, id');
 
-$setnames = [
-    'recompletiontype',
-    'recompletionduration',
-    'recompletionschedule',
-    'deletegradedata',
-    'archivecompletiondata',
-    'recompletionemailenable',
-    'recompletionunenrolenable',
-    'recompletionemailsubject',
-    'recompletionemailbody',
-    'recompletionemailbody_format',
-    'assignevent',
-    'nextresettime',
-];
-
-$plugins = local_recompletion_get_supported_plugins();
-foreach ($plugins as $plugin) {
-    if (substr($plugin, 0, 4) == 'mod_') {
-        // Backwards compatibility - module form fields use "assign" rather than "mod_assign.
-        $plugin = str_replace('mod_', '', $plugin);
-    }
-    $setnames[] = $plugin;
-    $setnames[] = 'archive'.$plugin;
-}
-
-$restrictions = local_recompletion_get_supported_restrictions();
-foreach ($restrictions as $plugin) {
-    $setnames[] = 'restrict' . $plugin;
-}
+$setnames = array('enable', 'recompletionduration', 'deletegradedata', 'quizdata', 'scormdata', 'archivecompletiondata',
+    'archivequizdata', 'archivescormdata', 'recompletionemailenable', 'recompletionemailsubject', 'recompletionemailbody',
+    'assigndata', 'assignevent');
 
 // Create the settings form instance.
-$customdata = ['course' => $course];
-if (!empty($config)) {
-    $customdata['instance'] = local_recompletion_get_data($config);
-}
-$form = new local_recompletion_recompletion_form('recompletion.php?id='.$id, $customdata);
+$form = new local_recompletion_recompletion_form('recompletion.php?id='.$id, array('course' => $course));
 
 if ($form->is_cancelled()) {
     redirect($CFG->wwwroot.'/course/view.php?id='.$course->id);
+
 } else if ($data = $form->get_data()) {
-    $data = local_recompletion_set_form_data($data);
     foreach ($setnames as $name) {
-        $value = 0;
-
-        if ($name === 'recompletionemailsubject' || $name === 'recompletionemailbody') {
-            $value = '';
-        }
-
-        if ($name === 'nextresettime') {
-            $value = local_recompletion_calculate_schedule_time($data->recompletionschedule);
-        }
-
         if (isset($data->$name)) {
             $value = $data->$name;
+        } else {
+            if ($name == 'recompletionemailsubject' || $name == 'recompletionemailbody') {
+                $value = '';
+            } else {
+                $value = 0;
+            }
         }
-
-        // Set if new or changed.
-        if (!isset($config[$name]) || $config[$name]->value <> $value) {
+        if (!isset($config[$name]) || $config[$name] <> $value) {
             $rc = new stdclass();
-            if (isset($config[$name])) {
-                $rc->id = $config[$name]->id;
+            if (isset($idmap[$name])) {
+                $rc->id = $idmap[$name];
             }
             $rc->name = $name;
             $rc->value = $value;
@@ -139,17 +101,17 @@ if ($form->is_cancelled()) {
             } else {
                 $DB->update_record('local_recompletion_config', $rc);
             }
-            if ($name == 'recompletiontype' && empty($value)) {
+            if ($name == 'enable' && empty($value)) {
                 // Don't overwrite any other settings when recompletion disabled.
                 break;
             }
         }
     }
     // Redirect to the course main page.
-    $url = new moodle_url('/local/recompletion/recompletion.php', ['id' => $course->id]);
+    $url = new moodle_url('/course/view.php', array('id' => $course->id));
     redirect($url, get_string('recompletionsettingssaved', 'local_recompletion'));
 } else if (!empty($config)) {
-    $form->set_data($customdata['instance']);
+    $form->set_data($config);
 }
 
 // Print the form.

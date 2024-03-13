@@ -56,12 +56,8 @@ class restore_reengagement_activity_task extends restore_activity_task {
      * Define the contents in the activity that must be
      * processed by the link decoder
      */
-    public static function define_decode_contents() {
+    static public function define_decode_contents() {
         $contents = array();
-
-        $contents[] = new restore_decode_content('reengagement', 'emailcontent');
-        $contents[] = new restore_decode_content('reengagement', 'emailcontentmanager');
-        $contents[] = new restore_decode_content('reengagement', 'emailcontentthirdparty');
 
         return $contents;
     }
@@ -70,7 +66,7 @@ class restore_reengagement_activity_task extends restore_activity_task {
      * Define the decoding rules for links belonging
      * to the activity to be executed by the link decoder
      */
-    public static function define_decode_rules() {
+    static public function define_decode_rules() {
         $rules = array();
 
         $rules[] = new restore_decode_rule('STANDDOWNVIEWBYID', '/mod/reengagement/view.php?id=$1', 'course_module');
@@ -86,7 +82,7 @@ class restore_reengagement_activity_task extends restore_activity_task {
      * reengagement logs. It must return one array
      * of {@see restore_log_rule} objects
      */
-    public static function define_restore_log_rules() {
+    static public function define_restore_log_rules() {
         $rules = array();
 
         return $rules;
@@ -102,7 +98,7 @@ class restore_reengagement_activity_task extends restore_activity_task {
      * by the restore final task, but are defined here at
      * activity level. All them are rules not linked to any module instance (cmid = 0)
      */
-    public static function define_restore_log_rules_for_course() {
+    static public function define_restore_log_rules_for_course() {
         $rules = array();
 
         // Fix old wrong uses (missing extension).

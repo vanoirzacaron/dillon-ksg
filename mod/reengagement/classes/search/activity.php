@@ -25,6 +25,7 @@
 
 namespace mod_reengagement\search;
 
+defined('MOODLE_INTERNAL') || die();
 
 /**
  * Search area for mod_reengagement activities.
